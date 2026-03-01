@@ -280,6 +280,17 @@ _TEST_SECRETS.close()
 os.environ.setdefault("DB_PATH", _TEST_DB_PATH)
 
 
+def _get_loaded_modules():
+    """Get module instances from the live app bootstrap."""
+    import src.main as main_module
+
+    http_module = main_module.module_registry.modules.get("http")
+    workspace_module = main_module.module_registry.modules.get("workspace")
+    assert http_module is not None, "http module must be loaded for HTTP API tests"
+    assert workspace_module is not None, "workspace module must be loaded for workspace API tests"
+    return main_module, http_module, workspace_module
+
+
 @pytest.fixture(autouse=True, scope="module")
 def setup_app_env():
     """Set environment vars and patch DB/config before any app import in this module."""
@@ -329,7 +340,11 @@ async def test_http_request_endpoint_get(app_client):
     """Test /api/tools/http/request endpoint with a GET request."""
     from src.models import HttpRequestResponse
 
-    with patch("src.main.http_tools") as mock_tools:
+    main_module, http_module, _ = _get_loaded_modules()
+
+    with patch.object(http_module, "http_tools") as mock_tools:
+        original_global = main_module.http_tools
+        main_module.http_tools = mock_tools
         mock_tools.request = AsyncMock(return_value=HttpRequestResponse(
             status_code=200,
             headers={"content-type": "text/plain"},
@@ -339,10 +354,13 @@ async def test_http_request_endpoint_get(app_client):
             content_type="text/plain",
         ))
 
-        response = await app_client.post(
-            "/api/tools/http/request",
-            json={"url": "https://httpbin.org/get", "method": "GET"},
-        )
+        try:
+            response = await app_client.post(
+                "/api/tools/http/request",
+                json={"url": "https://httpbin.org/get", "method": "GET"},
+            )
+        finally:
+            main_module.http_tools = original_global
 
     assert response.status_code == 200
     data = response.json()
@@ -355,13 +373,26 @@ async def test_workspace_secrets_list_endpoint(app_client):
     """Test /api/tools/workspace/secrets/list endpoint."""
     from pathlib import Path
 
+    main_module, _, workspace_module = _get_loaded_modules()
+
     with patch("src.main.secret_manager") as mock_sm:
         mock_sm.list_keys.return_value = ["API_KEY", "DB_PASS"]
         mock_sm.count.return_value = 2
         mock_sm.has_templates.return_value = False
         mock_sm.secrets_file = Path("/secrets/secrets.env")
 
-        response = await app_client.post("/api/tools/workspace/secrets/list")
+        original_global_sm = main_module.secret_manager
+        original_ctx_sm = workspace_module.context.secret_manager
+        original_ws_sm = workspace_module.workspace_tools.secret_manager
+        main_module.secret_manager = mock_sm
+        workspace_module.context.secret_manager = mock_sm
+        workspace_module.workspace_tools.secret_manager = mock_sm
+        try:
+            response = await app_client.post("/api/tools/workspace/secrets/list")
+        finally:
+            main_module.secret_manager = original_global_sm
+            workspace_module.context.secret_manager = original_ctx_sm
+            workspace_module.workspace_tools.secret_manager = original_ws_sm
 
     assert response.status_code == 200
     data = response.json()
@@ -374,6 +405,8 @@ async def test_workspace_secrets_list_endpoint(app_client):
 async def test_secret_template_in_http_headers(app_client):
     """Test that {{secret:KEY}} templates in headers are resolved before request."""
     from src.models import HttpRequestResponse
+
+    main_module, http_module, _ = _get_loaded_modules()
 
     with patch("src.main.secret_manager") as mock_sm:
         mock_sm.has_templates.return_value = True
@@ -388,7 +421,9 @@ async def test_secret_template_in_http_headers(app_client):
         }
         mock_sm.mask_value.side_effect = lambda x: x
 
-        with patch("src.main.http_tools") as mock_tools:
+        with patch.object(http_module, "http_tools") as mock_tools:
+            original_global = main_module.http_tools
+            main_module.http_tools = mock_tools
             mock_tools.request = AsyncMock(return_value=HttpRequestResponse(
                 status_code=200,
                 headers={},
@@ -397,14 +432,17 @@ async def test_secret_template_in_http_headers(app_client):
                 duration_ms=10,
             ))
 
-            response = await app_client.post(
-                "/api/tools/http/request",
-                json={
-                    "url": "https://api.example.com",
-                    "method": "GET",
-                    "headers": {"Authorization": "Bearer {{secret:MY_TOKEN}}"},
-                },
-            )
+            try:
+                response = await app_client.post(
+                    "/api/tools/http/request",
+                    json={
+                        "url": "https://api.example.com",
+                        "method": "GET",
+                        "headers": {"Authorization": "Bearer {{secret:MY_TOKEN}}"},
+                    },
+                )
+            finally:
+                main_module.http_tools = original_global
 
     assert response.status_code == 200
 
@@ -448,8 +486,12 @@ async def test_audit_log_shows_templates_not_resolved_values(app_client):
     # Use a unique URL so we can find exactly this request's audit record
     unique_url = "https://unique-audit-test.example.com/check-templates"
 
+    main_module, http_module, _ = _get_loaded_modules()
+
     with patch("src.main.secret_manager", real_sm):
-        with patch("src.main.http_tools") as mock_tools:
+        with patch.object(http_module, "http_tools") as mock_tools:
+            original_global = main_module.http_tools
+            main_module.http_tools = mock_tools
             mock_tools.request = AsyncMock(return_value=HttpRequestResponse(
                 status_code=200,
                 headers={},
@@ -458,14 +500,17 @@ async def test_audit_log_shows_templates_not_resolved_values(app_client):
                 duration_ms=10,
             ))
 
-            response = await app_client.post(
-                "/api/tools/http/request",
-                json={
-                    "url": unique_url,
-                    "method": "GET",
-                    "headers": {"Authorization": "Bearer {{secret:MY_TOKEN}}"},
-                },
-            )
+            try:
+                response = await app_client.post(
+                    "/api/tools/http/request",
+                    json={
+                        "url": unique_url,
+                        "method": "GET",
+                        "headers": {"Authorization": "Bearer {{secret:MY_TOKEN}}"},
+                    },
+                )
+            finally:
+                main_module.http_tools = original_global
 
     assert response.status_code == 200
 

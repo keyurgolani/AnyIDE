@@ -23,6 +23,7 @@ Built-in admin dashboard provides human oversight, HITL (Human-in-the-Loop) appr
 ### ✅ Implemented
 
 - **Dual Protocol Support:** MCP + OpenAPI simultaneously
+- **Modular Tool Loading:** Enable/disable tool categories at startup via `ANYIDE_MODULES` or `config.yaml`
 - **Filesystem Tools:** 
   - Read and write files with workspace sandboxing
   - List directory contents with recursive traversal
@@ -193,6 +194,7 @@ curl -X POST http://localhost:8080/api/tools/docker/action \
 │  │                                   │  │
 │  │  ┌─────────────────────────────┐ │  │
 │  │  │  Tool Execution Engine      │ │  │
+│  │  │  • Module Registry          │ │  │
 │  │  │  • Policy Enforcer          │ │  │
 │  │  │  • HITL Manager             │ │  │
 │  │  │  • Secret Resolver          │ │  │
@@ -215,15 +217,31 @@ curl -X POST http://localhost:8080/api/tools/docker/action \
 
 ```bash
 # Required
-ADMIN_PASSWORD=your-secure-password
+ANYIDE_ADMIN_PASSWORD=your-secure-password
 
 # Optional
-WORKSPACE_BASE_DIR=/workspace
+ANYIDE_WORKSPACE_BASE_DIR=/workspace
 ANYIDE_PORT=8080
-AUDIT_RETENTION_DAYS=30
-LOG_LEVEL=INFO
-HITL_TTL_SECONDS=300
+ANYIDE_AUDIT_RETENTION_DAYS=30
+ANYIDE_LOG_LEVEL=INFO
+ANYIDE_HITL_TTL_SECONDS=300
+ANYIDE_MODULES=all
 ```
+
+`ANYIDE_MODULES` supports:
+- `all` (default): load all built-in modules
+- `all,-docker,-http`: load all except listed modules
+- `fs,workspace,shell,git,memory,plan`: explicit allowlist
+
+### Module Selection (`config.yaml`)
+
+```yaml
+modules:
+  enabled: []          # empty => all available modules
+  disabled: []         # e.g. ["docker", "http"]
+```
+
+Environment variable `ANYIDE_MODULES` overrides `modules.enabled/disabled`.
 
 ### Secrets File
 

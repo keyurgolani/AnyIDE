@@ -31,8 +31,19 @@ async def connected_db():
 @pytest.fixture
 def mock_docker_tools():
     """Mock Docker tools."""
-    with patch('src.main.docker_tools') as mock:
-        yield mock
+    import src.main as main_module
+
+    docker_module = main_module.module_registry.modules.get("docker")
+    assert docker_module is not None, "docker module must be loaded for docker API tests"
+
+    with patch.object(docker_module, "docker_tools") as mock:
+        # Keep backward-compat global in sync for admin API/tests that import it.
+        original_global = main_module.docker_tools
+        main_module.docker_tools = mock
+        try:
+            yield mock
+        finally:
+            main_module.docker_tools = original_global
 
 
 @pytest.mark.asyncio

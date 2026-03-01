@@ -24,6 +24,11 @@ audit:
   retention_days: 30
   log_level: "INFO"
 
+modules:
+  # Empty enabled list => all built-in modules are enabled.
+  enabled: []
+  disabled: []
+
 # Tool Policies
 tools:
   defaults:

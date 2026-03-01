@@ -67,6 +67,12 @@ class HttpConfig(BaseModel):
     max_timeout: int = Field(120, description="Maximum allowed timeout in seconds")
 
 
+class ModulesConfig(BaseModel):
+    """Module enable/disable configuration."""
+    enabled: List[str] = Field(default_factory=list)
+    disabled: List[str] = Field(default_factory=list)
+
+
 class ToolsConfig(BaseModel):
     """Tools configuration."""
     defaults: ToolPolicyConfig = Field(default_factory=lambda: ToolPolicyConfig(workspace_override="hitl"))
@@ -86,6 +92,7 @@ class Config(BaseModel):
     audit: AuditConfig = Field(default_factory=AuditConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
     http: HttpConfig = Field(default_factory=HttpConfig)
+    modules: ModulesConfig = Field(default_factory=ModulesConfig)
 
 
 def load_config(config_path: str = "config.yaml") -> Config:

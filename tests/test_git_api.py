@@ -5,6 +5,8 @@ import pytest
 import tempfile
 import shutil
 import subprocess
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 
 # Set safe defaults before importing src.main (which initializes global services)
@@ -19,12 +21,14 @@ from src.main import app
 @pytest.fixture(autouse=True)
 async def connected_db():
     """Ensure app database is connected for each test."""
-    from src.main import db
+    from src.main import db, hitl_manager
 
     await db.connect()
+    await hitl_manager.start()
     try:
         yield
     finally:
+        await hitl_manager.stop()
         await db.close()
 
 
@@ -70,6 +74,7 @@ def setup_workspace(temp_workspace, monkeypatch):
     # Keep global app services aligned with test workspace.
     main_module.config.workspace.base_dir = temp_workspace
     main_module.workspace_manager.base_dir = os.path.realpath(temp_workspace)
+    return SimpleNamespace(temp_workspace=temp_workspace)
 
 
 @pytest.mark.asyncio
@@ -271,16 +276,17 @@ class TestGitHITLBehavior:
             # Try to commit - this should create a HITL request and wait
             # Since we don't have a HITL approver, this will hang if not handled
             # We test that the endpoint properly initiates HITL by checking behavior
-            response = await client.post(
-                "/api/tools/git/commit",
-                json={"repo_path": git_repo, "message": "Test HITL commit"},
-                timeout=2.0,  # Short timeout since we can't actually approve
-            )
+            with patch("src.main.hitl_manager") as mock_hitl:
+                mock_hitl.create_request = AsyncMock(return_value=MagicMock(id="hitl-test-id"))
+                mock_hitl.wait_for_decision = AsyncMock(return_value="rejected")
 
-            # The request should either timeout waiting for HITL approval
-            # or return a HITL pending status (depends on implementation)
-            # For now, we just verify the endpoint doesn't immediately execute
-            # In a real test, we'd mock the HITL manager
+                response = await client.post(
+                    "/api/tools/git/commit",
+                    json={"repo_path": git_repo, "message": "Test HITL commit"},
+                )
+
+            assert response.status_code == 403
+            mock_hitl.create_request.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_git_push_requires_hitl(self, git_repo, setup_workspace):
@@ -342,4 +348,3 @@ class TestGitHITLBehavior:
                 response = await client.post(endpoint, json=payload)
                 # Should succeed immediately without HITL
                 assert response.status_code == 200, f"{endpoint} should not require HITL"
-    assert "/api/tools/git/remote" in paths

@@ -34,6 +34,24 @@ Both protocols expose the same tools from a single source of truth - no code dup
 
 Before trying file operations, it's helpful to understand the workspace configuration:
 
+### Module Selection
+
+Use these deployment commands to verify module enable/disable behavior:
+
+```bash
+# Start with all modules except docker and http
+ANYIDE_MODULES=all,-docker,-http docker compose up -d --build
+
+# Confirm disabled modules are absent from OpenAPI
+curl -s http://localhost:8080/openapi.json | jq '.paths | keys[]' | grep '/api/tools/docker/' || true
+curl -s http://localhost:8080/openapi.json | jq '.paths | keys[]' | grep '/api/tools/http/' || true
+
+# Start with an explicit allowlist
+ANYIDE_MODULES=fs,workspace,shell,git,memory,plan docker compose up -d --build
+```
+
+If `jq` is not installed, save `openapi.json` and inspect it manually.
+
 ### Workspace Information
 
 **"What workspace am I working in?"**
@@ -743,6 +761,7 @@ When using MCP clients (Claude Desktop, Cursor, etc.), tools are identified by t
 ### OpenAPI Endpoints
 
 When using REST API directly:
+- Assumes `ANYIDE_MODULES=all`; disabled modules are omitted from discovery and endpoint registration.
 - `GET /health` - Health check
 - `POST /api/tools/fs/read` - Read files
 - `POST /api/tools/fs/write` - Write files
