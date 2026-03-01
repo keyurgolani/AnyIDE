@@ -38,13 +38,13 @@ Use semantic versioning:
 
 ```bash
 # Latest stable release
-docker tag anyide:latest yourusername/anyide:latest
+docker tag anyide:latest keyurgolani/anyide:latest
 
 # Specific version
-docker tag anyide:latest yourusername/anyide:0.1.0
+docker tag anyide:latest keyurgolani/anyide:0.1.0
 
 # Version series
-docker tag anyide:latest yourusername/anyide:0.1
+docker tag anyide:latest keyurgolani/anyide:0.1
 ```
 
 ## Publishing to Docker Hub
@@ -58,24 +58,24 @@ docker login
 ### Step 2: Tag the Image
 
 ```bash
-# Replace 'yourusername' with your Docker Hub username
-docker tag anyide:latest yourusername/anyide:latest
-docker tag anyide:latest yourusername/anyide:0.1.0
+# Replace 'keyurgolani' with your Docker Hub username
+docker tag anyide:latest keyurgolani/anyide:latest
+docker tag anyide:latest keyurgolani/anyide:0.1.0
 ```
 
 ### Step 3: Push
 
 ```bash
-docker push yourusername/anyide:latest
-docker push yourusername/anyide:0.1.0
+docker push keyurgolani/anyide:latest
+docker push keyurgolani/anyide:0.1.0
 ```
 
 ### One-liner
 
 ```bash
-docker build -t yourusername/anyide:latest -t yourusername/anyide:0.1.0 . && \
-docker push yourusername/anyide:latest && \
-docker push yourusername/anyide:0.1.0
+docker build -t keyurgolani/anyide:latest -t keyurgolani/anyide:0.1.0 . && \
+docker push keyurgolani/anyide:latest && \
+docker push keyurgolani/anyide:0.1.0
 ```
 
 ## GitHub Actions Automation
@@ -144,7 +144,7 @@ jobs:
      -v ./workspace:/workspace \
      -v ./data:/data \
      -e ADMIN_PASSWORD=your_password \
-     yourusername/anyide:latest
+     keyurgolani/anyide:latest
    ```
 
    ## Features
@@ -158,8 +158,8 @@ jobs:
 
    ## Documentation
 
-   - [GitHub Repository](https://github.com/yourusername/anyide)
-   - [Documentation](https://github.com/yourusername/anyide#readme)
+   - [GitHub Repository](https://github.com/keyurgolani/anyide)
+   - [Documentation](https://github.com/keyurgolani/anyide#readme)
    ```
 
 3. Configure webhooks (optional):
@@ -188,9 +188,9 @@ git push origin v0.1.0
 
 ```bash
 # Re-tag a previous version as latest
-docker pull yourusername/anyide:0.0.9
-docker tag yourusername/anyide:0.0.9 yourusername/anyide:latest
-docker push yourusername/anyide:latest
+docker pull keyurgolani/anyide:0.0.9
+docker tag keyurgolani/anyide:0.0.9 keyurgolani/anyide:latest
+docker push keyurgolani/anyide:latest
 ```
 
 ## Security Best Practices
@@ -199,7 +199,7 @@ docker push yourusername/anyide:latest
 2. Use GitHub secrets for Docker Hub credentials
 3. Scan images for vulnerabilities:
    ```bash
-   docker scout cves yourusername/anyide:latest
+   docker scout cves keyurgolani/anyide:latest
    ```
 4. Sign images with Docker Content Trust
 5. Use minimal base images for smaller attack surface
@@ -210,10 +210,10 @@ After publishing, verify the image:
 
 ```bash
 # Pull fresh image
-docker pull yourusername/anyide:latest
+docker pull keyurgolani/anyide:latest
 
 # Run and test
-docker run -d -p 8080:8080 -e ADMIN_PASSWORD=test yourusername/anyide:latest
+docker run -d -p 8080:8080 -e ADMIN_PASSWORD=test keyurgolani/anyide:latest
 
 # Check health
 curl http://localhost:8080/health

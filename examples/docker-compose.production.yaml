@@ -3,7 +3,7 @@
 
 services:
   anyide:
-    image: yourusername/anyide:latest
+    image: keyurgolani/anyide:latest
     container_name: anyide
     restart: unless-stopped
 
