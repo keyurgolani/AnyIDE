@@ -1,7 +1,7 @@
 [project]
-name = "hostbridge"
+name = "anyide"
 version = "0.1.0"
-description = "Unified MCP + OpenAPI Tool Server for Self-Hosted LLM Stacks"
+description = "Self-hosted tool server exposing host-machine capabilities to LLM clients via MCP and OpenAPI protocols"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.109.0",

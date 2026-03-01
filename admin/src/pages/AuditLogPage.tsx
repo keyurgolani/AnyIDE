@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { FileText, Search, Download, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { FileText, Search, Download, X, ChevronLeft, ChevronRight, Wifi, WifiOff, RefreshCw } from 'lucide-react'
 import { api } from '@/lib/api'
+import { logsWsClient } from '@/lib/logsWebSocket'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -18,8 +19,14 @@ export default function AuditLogPage() {
   const [showExport, setShowExport] = useState(false)
   const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json')
   const [isExporting, setIsExporting] = useState(false)
+  const [isWsConnected, setIsWsConnected] = useState(false)
+  const [isPolling, setIsPolling] = useState(false)
+  const [newLogsCount, setNewLogsCount] = useState(0)
+  const queryClient = useQueryClient()
+  const pollingIntervalRef = useRef<number | null>(null)
 
-  const { data: logsData, isLoading } = useQuery({
+  // Primary data fetch with React Query
+  const { data: logsData, isLoading, refetch } = useQuery({
     queryKey: ['audit-logs-filtered', searchTerm, statusFilter, categoryFilter, page],
     queryFn: () => api.getFilteredAuditLogs({
       limit: pageSize,
@@ -28,8 +35,76 @@ export default function AuditLogPage() {
       tool_category: categoryFilter !== 'all' ? categoryFilter : undefined,
       search: searchTerm || undefined,
     }),
-    refetchInterval: 5000,
+    refetchInterval: false, // We handle real-time updates via websocket or fallback polling
   })
+
+  // WebSocket connection and message handling
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null
+
+    const connectWebSocket = async () => {
+      const connected = await logsWsClient.connect()
+      setIsWsConnected(connected)
+
+      if (connected) {
+        // Subscribe to log updates
+        logsWsClient.subscribe(2)
+
+        // Set up message handler
+        unsubscribe = logsWsClient.onMessage((message) => {
+          if (message.type === 'initial_logs' || message.type === 'new_logs') {
+            // When filters are active, just invalidate the query to refetch
+            if (statusFilter !== 'all' || categoryFilter !== 'all' || searchTerm) {
+              queryClient.invalidateQueries({ queryKey: ['audit-logs-filtered'] })
+            } else if (message.type === 'new_logs' && page === 0) {
+              // Only show new logs indicator if on first page with no filters
+              setNewLogsCount((prev) => prev + message.data.length)
+            } else if (message.type === 'initial_logs') {
+              // Initial logs loaded - refresh the data
+              queryClient.invalidateQueries({ queryKey: ['audit-logs-filtered'] })
+            }
+          }
+        })
+      } else {
+        // Fall back to polling if WebSocket fails
+        startPolling()
+      }
+    }
+
+    const startPolling = () => {
+      setIsPolling(true)
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+      }
+      pollingIntervalRef.current = window.setInterval(() => {
+        refetch()
+      }, 5000)
+    }
+
+    connectWebSocket()
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe()
+      }
+      logsWsClient.unsubscribe()
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+      }
+    }
+  }, [queryClient, statusFilter, categoryFilter, searchTerm, page, refetch])
+
+  // Handle refresh button click
+  const handleRefresh = useCallback(() => {
+    setNewLogsCount(0)
+    refetch()
+  }, [refetch])
+
+  // Handle showing new logs
+  const handleShowNewLogs = useCallback(() => {
+    setNewLogsCount(0)
+    refetch()
+  }, [refetch])
 
   const logs = logsData?.logs || []
   const total = logsData?.total || 0
@@ -78,15 +153,61 @@ export default function AuditLogPage() {
             Complete history of all tool executions
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => setShowExport(!showExport)}
-          className="w-full md:w-auto"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Export
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Connection Status */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 text-sm">
+            {isWsConnected ? (
+              <>
+                <Wifi className="w-4 h-4 text-green-500" />
+                <span className="text-muted-foreground">Live</span>
+              </>
+            ) : isPolling ? (
+              <>
+                <RefreshCw className="w-4 h-4 text-yellow-500" />
+                <span className="text-muted-foreground">Polling</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-4 h-4 text-red-500" />
+                <span className="text-muted-foreground">Offline</span>
+              </>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            className="w-full md:w-auto"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowExport(!showExport)}
+            className="w-full md:w-auto"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export
+          </Button>
+        </div>
       </motion.div>
+
+      {/* New Logs Notification */}
+      {newLogsCount > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-primary/10 border border-primary/30 rounded-lg p-3 flex items-center justify-between"
+        >
+          <span className="text-sm">
+            <span className="font-semibold">{newLogsCount}</span> new log{newLogsCount !== 1 ? 's' : ''} available
+          </span>
+          <Button size="sm" onClick={handleShowNewLogs}>
+            Show
+          </Button>
+        </motion.div>
+      )}
 
       {/* Export Panel */}
       {showExport && (

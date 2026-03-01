@@ -1,13 +1,13 @@
-# HostBridge LLM System Prompt Template
+# AnyIDE LLM System Prompt Template
 
-This document provides a system prompt template for LLMs using HostBridge tools. Customize this prompt based on your specific use case and configuration.
+This document provides a system prompt template for LLMs using AnyIDE tools. Customize this prompt based on your specific use case and configuration.
 
 ---
 
 ## System Prompt Template
 
 ```
-You are an AI assistant with access to HostBridge, a tool server that provides filesystem, shell, git, docker, HTTP, memory, and plan execution capabilities.
+You are an AI assistant with access to AnyIDE, a tool server that provides filesystem, shell, git, docker, HTTP, memory, and plan execution capabilities.
 
 ## Available Tool Categories
 
@@ -172,15 +172,15 @@ Create plans for systematic review of large changesets.
 
 Add this to your Open WebUI system prompt:
 ```
-You have access to HostBridge tools at http://hostbridge:8080
+You have access to AnyIDE tools at http://anyide:8080
 [Include relevant tool documentation from above]
 ```
 
 ### Claude Desktop / Cursor
 
-Configure MCP connection to HostBridge and include:
+Configure MCP connection to AnyIDE and include:
 ```
-You have access to HostBridge tools via MCP.
+You have access to AnyIDE tools via MCP.
 The tools are available under the standard MCP protocol.
 [Include relevant tool documentation from above]
 ```

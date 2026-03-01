@@ -1,6 +1,6 @@
-# HostBridge - Commands to Try
+# AnyIDE - Commands to Try
 
-This document provides sample requests you can give to an LLM that has access to the HostBridge tool server. These commands demonstrate the capabilities of each tool currently available.
+This document provides sample requests you can give to an LLM that has access to the AnyIDE tool server. These commands demonstrate the capabilities of each tool currently available.
 
 ## Admin Dashboard
 
@@ -24,7 +24,7 @@ The dashboard provides a unified widget-based interface:
 
 ## Protocol Support
 
-HostBridge supports two protocols:
+AnyIDE supports two protocols:
 - **OpenAPI (REST)**: Traditional HTTP REST API
 - **MCP (Model Context Protocol)**: Modern protocol for AI tool integration using Streamable HTTP
 
@@ -307,7 +307,7 @@ Before trying file operations, it's helpful to understand the workspace configur
 
 ### Secret Templates
 
-HostBridge resolves `{{secret:KEY}}` placeholders server-side in any tool parameter before execution. The original template (not the resolved value) is stored in audit logs.
+AnyIDE resolves `{{secret:KEY}}` placeholders server-side in any tool parameter before execution. The original template (not the resolved value) is stored in audit logs.
 
 **"What secrets are available to use?"**
 - Returns the list of loaded secret key names without exposing their values
@@ -370,7 +370,7 @@ HostBridge resolves `{{secret:KEY}}` placeholders server-side in any tool parame
 
 ### Inspecting Containers
 
-**"Inspect the hostbridge container"**
+**"Inspect the anyide container"**
 - Gets detailed information about a specific container
 
 **"Show me the configuration of the nginx container"**
@@ -387,7 +387,7 @@ HostBridge resolves `{{secret:KEY}}` placeholders server-side in any tool parame
 
 ### Viewing Container Logs
 
-**"Show me the logs from the hostbridge container"**
+**"Show me the logs from the anyide container"**
 - Retrieves last 100 lines of container logs (default)
 
 **"Get the last 50 lines of logs from nginx"**
@@ -616,7 +616,7 @@ When working with an LLM that has access to these tools:
 
 ## Current Tool Inventory
 
-As of this version, HostBridge supports:
+As of this version, AnyIDE supports:
 
 - **Health Check** (via MCP: `health_check_health_get`)
   - Check server health and version

@@ -1,1 +1,1 @@
-"""Tests for HostBridge."""
+"""Tests for AnyIDE."""

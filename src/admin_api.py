@@ -364,66 +364,127 @@ async def get_detailed_health(session_token: str = Depends(require_auth)):
 
 
 # ---------------------------------------------------------------------------
-# Tool Explorer
+# Tool Explorer - Built from OpenAPI Contract
 # ---------------------------------------------------------------------------
+
+# Valid tool categories derived from mounted sub-apps
+TOOL_CATEGORIES = ["fs", "workspace", "shell", "git", "docker", "http", "memory", "plan"]
+
+
+def _extract_tools_from_openapi(openapi_schema: dict, policy_engine) -> List[ToolSchema]:
+    """Extract tool information from the OpenAPI schema.
+
+    This function parses the OpenAPI schema to find tool endpoints,
+    extracting their names, categories, descriptions, and schemas.
+    HITL requirements are computed from the effective policy configuration.
+    """
+    tools = []
+    paths = openapi_schema.get("paths", {})
+    components = openapi_schema.get("components", {}).get("schemas", {})
+
+    for path, path_item in paths.items():
+        # Only consider tool API paths (not admin, health, or other routes)
+        if not path.startswith("/api/tools/"):
+            continue
+
+        # Extract category and name from path: /api/tools/{category}/{name}
+        path_parts = path.split("/")
+        if len(path_parts) < 5:
+            continue
+
+        category = path_parts[3]
+        name = path_parts[4]
+
+        # Skip if not a valid tool category
+        if category not in TOOL_CATEGORIES:
+            continue
+
+        # Get POST operation (all tool endpoints use POST)
+        post_op = path_item.get("post")
+        if not post_op:
+            continue
+
+        # Get operation_id to validate it matches expected pattern
+        operation_id = post_op.get("operationId", "")
+        if operation_id != f"{category}_{name}":
+            continue
+
+        # Get description from the operation
+        description = post_op.get("summary", f"Execute {name} operation")
+        if post_op.get("description"):
+            description = post_op["description"]
+
+        # Extract input schema from request body
+        input_schema = {}
+        request_body = post_op.get("requestBody")
+        if request_body:
+            content = request_body.get("content", {})
+            json_content = content.get("application/json", {})
+            schema_ref = json_content.get("schema", {})
+
+            # Resolve $ref if present
+            if "$ref" in schema_ref:
+                ref_name = schema_ref["$ref"].split("/")[-1]
+                if ref_name in components:
+                    input_schema = components[ref_name]
+            else:
+                input_schema = schema_ref
+
+        # Extract output schema from responses
+        output_schema = None
+        responses = post_op.get("responses", {})
+        success_response = responses.get("200", responses.get("200", {}))
+        if success_response:
+            content = success_response.get("content", {})
+            json_content = content.get("application/json", {})
+            schema_ref = json_content.get("schema", {})
+
+            if "$ref" in schema_ref:
+                ref_name = schema_ref["$ref"].split("/")[-1]
+                if ref_name in components:
+                    output_schema = components[ref_name]
+            elif schema_ref:
+                output_schema = schema_ref
+
+        # Compute HITL requirement from effective policy configuration
+        tool_key = f"{category}_{name}"
+        requires_hitl = False
+
+        # Check if policy engine has rules and if any rule requires HITL for this tool
+        if hasattr(policy_engine, 'rules') and policy_engine.rules:
+            for rule in policy_engine.rules:
+                if rule.tool == tool_key and rule.action == 'hitl':
+                    requires_hitl = True
+                    break
+        elif hasattr(policy_engine, 'should_require_hitl'):
+            # Fallback to checking via should_require_hitl method if available
+            requires_hitl = policy_engine.should_require_hitl(tool_key)
+
+        tools.append(ToolSchema(
+            name=name,
+            category=category,
+            description=description,
+            input_schema=input_schema,
+            output_schema=output_schema,
+            requires_hitl=requires_hitl,
+        ))
+
+    # Sort by category then name for consistent ordering
+    tools.sort(key=lambda t: (t.category, t.name))
+
+    return tools
+
 
 @router.get("/tools", response_model=ToolListResponse)
 async def list_tools(session_token: str = Depends(require_auth)):
-    """List all available tools with their schemas."""
-    from src.main import (
-        fs_tools, workspace_tools, shell_tools, git_tools,
-        docker_tools, http_tools, memory_tools, plan_tools,
-        policy_engine
-    )
+    """List all available tools with their schemas derived from OpenAPI contract."""
+    from src.main import app, policy_engine
 
-    tools = []
+    # Get the OpenAPI schema from the FastAPI app
+    openapi_schema = app.openapi()
 
-    # Helper to extract tool info from a tool class
-    def extract_tools(tool_instance, category: str):
-        result = []
-        for name in dir(tool_instance):
-            if name.startswith('_'):
-                continue
-            method = getattr(tool_instance, name)
-            if callable(method) and hasattr(method, '__doc__'):
-                # Get the schema from the method if available
-                schema = {}
-                requires_hitl = False
-
-                # Check policy for HITL requirement
-                tool_key = f"{category}_{name}"
-                if hasattr(policy_engine, 'rules'):
-                    for rule in policy_engine.rules:
-                        if rule.tool == tool_key and rule.action == 'hitl':
-                            requires_hitl = True
-                            break
-
-                result.append(ToolSchema(
-                    name=name,
-                    category=category,
-                    description=method.__doc__ or f"Execute {name} operation",
-                    input_schema=schema,
-                    requires_hitl=requires_hitl,
-                ))
-        return result
-
-    # Extract tools from each tool category
-    if fs_tools:
-        tools.extend(extract_tools(fs_tools, "fs"))
-    if workspace_tools:
-        tools.extend(extract_tools(workspace_tools, "workspace"))
-    if shell_tools:
-        tools.extend(extract_tools(shell_tools, "shell"))
-    if git_tools:
-        tools.extend(extract_tools(git_tools, "git"))
-    if docker_tools:
-        tools.extend(extract_tools(docker_tools, "docker"))
-    if http_tools:
-        tools.extend(extract_tools(http_tools, "http"))
-    if memory_tools:
-        tools.extend(extract_tools(memory_tools, "memory"))
-    if plan_tools:
-        tools.extend(extract_tools(plan_tools, "plan"))
+    # Extract tools from the OpenAPI schema
+    tools = _extract_tools_from_openapi(openapi_schema, policy_engine)
 
     return ToolListResponse(tools=tools, total=len(tools))
 
@@ -434,61 +495,88 @@ async def get_tool_schema(
     name: str,
     session_token: str = Depends(require_auth)
 ):
-    """Get detailed schema for a specific tool."""
-    from src.main import (
-        fs_tools, workspace_tools, shell_tools, git_tools,
-        docker_tools, http_tools, memory_tools, plan_tools,
-        policy_engine
-    )
+    """Get detailed schema for a specific tool from OpenAPI contract."""
+    from src.main import app, policy_engine
 
-    # Map category to tool instance
-    tool_map = {
-        "fs": fs_tools,
-        "workspace": workspace_tools,
-        "shell": shell_tools,
-        "git": git_tools,
-        "docker": docker_tools,
-        "http": http_tools,
-        "memory": memory_tools,
-        "plan": plan_tools,
-    }
-
-    tool_instance = tool_map.get(category)
-    if not tool_instance:
+    # Validate category
+    if category not in TOOL_CATEGORIES:
         raise HTTPException(status_code=404, detail=f"Tool category '{category}' not found")
 
-    method = getattr(tool_instance, name, None)
-    if not method or not callable(method):
+    # Get the OpenAPI schema
+    openapi_schema = app.openapi()
+
+    # Look for the specific tool endpoint
+    tool_path = f"/api/tools/{category}/{name}"
+    paths = openapi_schema.get("paths", {})
+    components = openapi_schema.get("components", {}).get("schemas", {})
+
+    path_item = paths.get(tool_path)
+    if not path_item:
         raise HTTPException(status_code=404, detail=f"Tool '{category}_{name}' not found")
 
-    # Check policy for HITL requirement
-    requires_hitl = False
+    post_op = path_item.get("post")
+    if not post_op:
+        raise HTTPException(status_code=404, detail=f"Tool '{category}_{name}' not found")
+
+    # Validate operation_id
+    operation_id = post_op.get("operationId", "")
+    if operation_id != f"{category}_{name}":
+        raise HTTPException(status_code=404, detail=f"Tool '{category}_{name}' not found")
+
+    # Get description
+    description = post_op.get("summary", f"Execute {name} operation")
+    if post_op.get("description"):
+        description = post_op["description"]
+
+    # Extract input schema
+    input_schema = {}
+    request_body = post_op.get("requestBody")
+    if request_body:
+        content = request_body.get("content", {})
+        json_content = content.get("application/json", {})
+        schema_ref = json_content.get("schema", {})
+
+        if "$ref" in schema_ref:
+            ref_name = schema_ref["$ref"].split("/")[-1]
+            if ref_name in components:
+                input_schema = components[ref_name]
+        else:
+            input_schema = schema_ref
+
+    # Extract output schema
+    output_schema = None
+    responses = post_op.get("responses", {})
+    success_response = responses.get("200", {})
+    if success_response:
+        content = success_response.get("content", {})
+        json_content = content.get("application/json", {})
+        schema_ref = json_content.get("schema", {})
+
+        if "$ref" in schema_ref:
+            ref_name = schema_ref["$ref"].split("/")[-1]
+            if ref_name in components:
+                output_schema = components[ref_name]
+        elif schema_ref:
+            output_schema = schema_ref
+
+    # Compute HITL requirement
     tool_key = f"{category}_{name}"
-    if hasattr(policy_engine, 'rules'):
+    requires_hitl = False
+
+    if hasattr(policy_engine, 'rules') and policy_engine.rules:
         for rule in policy_engine.rules:
             if rule.tool == tool_key and rule.action == 'hitl':
                 requires_hitl = True
                 break
-
-    # Try to get schema from inspect
-    import inspect
-    sig = inspect.signature(method)
-    input_schema = {
-        "parameters": {
-            name: {
-                "type": "any",
-                "required": param.default == inspect.Parameter.empty,
-            }
-            for name, param in sig.parameters.items()
-            if name != 'self'
-        }
-    }
+    elif hasattr(policy_engine, 'should_require_hitl'):
+        requires_hitl = policy_engine.should_require_hitl(tool_key)
 
     return ToolSchema(
         name=name,
         category=category,
-        description=method.__doc__ or f"Execute {name} operation",
+        description=description,
         input_schema=input_schema,
+        output_schema=output_schema,
         requires_hitl=requires_hitl,
     )
 

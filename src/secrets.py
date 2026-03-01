@@ -1,4 +1,4 @@
-"""Secret management for HostBridge.
+"""Secret management for AnyIDE.
 
 Loads secrets from a .env-format file and provides:
 - Secret key listing (without values)

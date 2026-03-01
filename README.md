@@ -1,6 +1,6 @@
-# HostBridge
+# AnyIDE
 
-**Unified MCP + OpenAPI Tool Server for Self-Hosted LLM Stacks**
+**Self-hosted tool server exposing host-machine capabilities to LLM clients via MCP and OpenAPI protocols**
 
 Version: 0.1.0  
 Status: ✅ Production Ready
@@ -9,7 +9,7 @@ Status: ✅ Production Ready
 
 ## Overview
 
-HostBridge is a single Docker container that exposes host-machine management capabilities to LLM applications via two industry-standard protocols simultaneously:
+AnyIDE is a single Docker container that exposes host-machine management capabilities to LLM applications via two industry-standard protocols simultaneously:
 
 - **MCP (Model Context Protocol)** over Streamable HTTP
 - **OpenAPI (REST/JSON)** for tools like Open WebUI
@@ -61,13 +61,20 @@ Built-in admin dashboard provides human oversight, HITL (Human-in-the-Loop) appr
 ### ✅ Admin Dashboard Enhancements (Complete)
 
 - **Tool Explorer:** Browse and inspect all available tools with their JSON schemas
+  - Tool list built from OpenAPI contract (not reflection)
+  - Accurate HITL indicators from effective policy configuration
+  - Input/output schemas populated from request/response models
 - **Configuration Viewer:** View current server configuration and HTTP settings
 - **Secrets Management:** View loaded secret keys and trigger hot reload from the UI
 - **Enhanced System Health:** Real-time CPU, memory, database, and workspace metrics
-- **Audit Log Export:** Export filtered logs as JSON or CSV
+- **Audit Log Enhancements:**
+  - Export filtered logs as JSON or CSV
+  - Real-time WebSocket streaming with polling fallback
+  - Live connection status indicator (Live/Polling/Offline)
+  - New log notification badges
 - **Real-time Audit Stream:** WebSocket endpoint for live audit event streaming
 - **Browser Notifications:** Desktop alerts for HITL approval requests
-- **Container Log Viewer:** View logs from Docker containers in admin UI
+- **Container Log Viewer:** Dedicated page to browse containers and view their logs
 - **Mobile Responsive:** Full responsive design for all device sizes
 
 ### ✅ MCP Protocol Improvements
@@ -142,12 +149,12 @@ curl -X POST http://localhost:8080/api/tools/docker/list \
 # Inspect a Docker container
 curl -X POST http://localhost:8080/api/tools/docker/inspect \
   -H "Content-Type: application/json" \
-  -d '{"container": "hostbridge"}'
+  -d '{"container": "anyide"}'
 
 # Get Docker container logs
 curl -X POST http://localhost:8080/api/tools/docker/logs \
   -H "Content-Type: application/json" \
-  -d '{"container": "hostbridge", "tail": 50}'
+  -d '{"container": "anyide", "tail": 50}'
 
 # Write a file (triggers HITL for .conf files)
 curl -X POST http://localhost:8080/api/tools/fs/write \
@@ -212,7 +219,7 @@ ADMIN_PASSWORD=your-secure-password
 
 # Optional
 WORKSPACE_BASE_DIR=/workspace
-HOSTBRIDGE_PORT=8080
+ANYIDE_PORT=8080
 AUDIT_RETENTION_DAYS=30
 LOG_LEVEL=INFO
 HITL_TTL_SECONDS=300
@@ -263,7 +270,7 @@ http:
 
 ```yaml
 services:
-  hostbridge:
+  anyide:
     build: .
     ports:
       - "8080:8080"
@@ -572,7 +579,7 @@ npm run dev
 - **Admin Dashboard Guide:** `admin/README.md` - Complete dashboard documentation
 - **Commands to Try:** `CommandsToTry.md` - Sample commands for LLM interaction
 - **Tool Catalog:** `docs/TOOL_CATALOG.md` - Auto-generated endpoint and MCP tool reference
-- **LLM Prompt Template:** `docs/LLM_SYSTEM_PROMPT.md` - Starter system prompt for HostBridge-connected assistants
+- **LLM Prompt Template:** `docs/LLM_SYSTEM_PROMPT.md` - Starter system prompt for AnyIDE-connected assistants
 - **Docker Publishing Guide:** `docs/DOCKER_HUB_PUBLISHING.md` - Build/tag/publish workflow
 - **Deployment Examples:** `examples/` - `config.basic.yaml`, `config.development.yaml`, `config.restricted.yaml`, and production compose template
 - **API Documentation:** http://localhost:8080/docs - Interactive OpenAPI docs
@@ -603,9 +610,11 @@ npm run dev
 - DAG plan execution with concurrency, task references, and configurable failure policies.
 
 ### Test Coverage Snapshot
-- `pytest --collect-only -q` reports 426 backend tests.
+- `pytest --collect-only -q` reports 434 backend tests.
 - Memory tool suite: 48 tests.
 - Plan execution suite: 57 tests.
+- HITL WebSocket roundtrip tests: 7 tests.
+- Tool Explorer contract tests: 13 tests.
 - Frontend admin auth/session tests run with Vitest + jsdom.
 
 ---
@@ -628,7 +637,7 @@ Contributions are welcome. Prefer focused pull requests, include tests for behav
 
 1. **Check container logs:**
    ```bash
-   docker compose logs hostbridge -f
+   docker compose logs anyide -f
    ```
 
 2. **Verify health:**
@@ -673,7 +682,7 @@ Built following the design principles from:
 
 The project includes comprehensive test coverage.
 
-As of this snapshot, `pytest --collect-only -q` reports **426 tests collected** across:
+As of this snapshot, `pytest --collect-only -q` reports **434 tests collected** across:
 
 - Unit tests for core modules and tool implementations
 - API and admin endpoint integration tests
@@ -681,4 +690,6 @@ As of this snapshot, `pytest --collect-only -q` reports **426 tests collected** 
 - Security regression tests (path traversal, SSRF, auth enforcement, input handling)
 - Load/concurrency tests for frequent file and API operations
 - Feature-specific suites for Git, Docker, memory graph, plan execution, secrets, and HTTP
+- Tool Explorer contract tests verifying OpenAPI-based tool listing
+- HITL WebSocket roundtrip and disconnect resilience tests
 - Frontend unit tests (Vitest + jsdom) for admin auth/session behavior
