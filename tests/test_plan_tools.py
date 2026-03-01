@@ -29,7 +29,7 @@ os.environ["WORKSPACE_BASE_DIR"] = _TEST_WORKSPACE
 @pytest_asyncio.fixture(scope="module")
 async def plan_db():
     """A connected Database instance used for all plan tool tests."""
-    from src.database import Database
+    from anyide.core.database import Database
 
     db = Database(_TEST_DB_PATH)
     await db.connect()
@@ -40,7 +40,7 @@ async def plan_db():
 @pytest_asyncio.fixture
 async def plan_tools(plan_db):
     """Fresh PlanTools instance — DB is shared but plan/task tables are wiped."""
-    from src.tools.plan_tools import PlanTools
+    from anyide.modules.plan.tools import PlanTools
 
     conn = plan_db.connection
     await conn.execute("DELETE FROM plan_tasks")
@@ -57,7 +57,7 @@ async def plan_tools(plan_db):
 
 def _make_plan_tools(plan_db, dispatch=None, hitl=None):
     """Helper to build a PlanTools with custom dispatch/hitl."""
-    from src.tools.plan_tools import PlanTools
+    from anyide.modules.plan.tools import PlanTools
 
     if dispatch is None:
         async def dispatch(category, name, params):
@@ -76,7 +76,7 @@ def _make_plan_tools(plan_db, dispatch=None, hitl=None):
 
 def make_task(tid, name=None, tool_cat="fs", tool_name="read", params=None, depends_on=None, on_failure=None, require_hitl=False):
     """Build a PlanTaskDef dict quickly."""
-    from src.models import PlanTaskDef
+    from anyide.models import PlanTaskDef
 
     return PlanTaskDef(
         id=tid,
@@ -91,7 +91,7 @@ def make_task(tid, name=None, tool_cat="fs", tool_name="read", params=None, depe
 
 
 def make_create_req(name, tasks, on_failure="stop"):
-    from src.models import PlanCreateRequest
+    from anyide.models import PlanCreateRequest
 
     return PlanCreateRequest(name=name, tasks=tasks, on_failure=on_failure)
 
@@ -147,7 +147,7 @@ class TestPlanCreate:
 
     @pytest.mark.asyncio
     async def test_create_empty_tasks_raises(self, plan_tools):
-        from src.tools.plan_tools import PlanValidationError
+        from anyide.modules.plan.tools import PlanValidationError
 
         with pytest.raises(PlanValidationError, match="at least one task"):
             await plan_tools.create(make_create_req("empty", []))
@@ -155,7 +155,7 @@ class TestPlanCreate:
     @pytest.mark.asyncio
     async def test_create_cycle_raises(self, plan_tools):
         """A → B → A is a cycle."""
-        from src.tools.plan_tools import PlanValidationError
+        from anyide.modules.plan.tools import PlanValidationError
 
         tasks = [
             make_task("a", depends_on=["b"]),
@@ -166,7 +166,7 @@ class TestPlanCreate:
 
     @pytest.mark.asyncio
     async def test_create_self_loop_raises(self, plan_tools):
-        from src.tools.plan_tools import PlanValidationError
+        from anyide.modules.plan.tools import PlanValidationError
 
         tasks = [make_task("a", depends_on=["a"])]
         with pytest.raises(PlanValidationError):
@@ -174,7 +174,7 @@ class TestPlanCreate:
 
     @pytest.mark.asyncio
     async def test_create_unknown_dependency_raises(self, plan_tools):
-        from src.tools.plan_tools import PlanValidationError
+        from anyide.modules.plan.tools import PlanValidationError
 
         tasks = [make_task("a", depends_on=["nonexistent"])]
         with pytest.raises(PlanValidationError, match="unknown task"):
@@ -182,7 +182,7 @@ class TestPlanCreate:
 
     @pytest.mark.asyncio
     async def test_create_duplicate_task_ids_raises(self, plan_tools):
-        from src.tools.plan_tools import PlanValidationError
+        from anyide.modules.plan.tools import PlanValidationError
 
         tasks = [make_task("a"), make_task("a")]
         with pytest.raises(PlanValidationError, match="Duplicate"):
@@ -190,7 +190,7 @@ class TestPlanCreate:
 
     @pytest.mark.asyncio
     async def test_create_invalid_on_failure_raises(self, plan_tools):
-        from src.tools.plan_tools import PlanValidationError
+        from anyide.modules.plan.tools import PlanValidationError
 
         tasks = [make_task("a")]
         req = make_create_req("bad_policy", tasks, on_failure="invalid_policy")
@@ -241,7 +241,7 @@ class TestPlanExecuteSuccess:
         create_req = make_create_req("single_exec", [make_task("t1", tool_cat="shell", tool_name="execute")])
         created = await pt.create(create_req)
 
-        from src.models import PlanExecuteRequest
+        from anyide.models import PlanExecuteRequest
 
         result = await pt.execute(PlanExecuteRequest(plan_id=created.plan_id))
 
@@ -274,7 +274,7 @@ class TestPlanExecuteSuccess:
         ]
         created = await pt.create(make_create_req("chain_exec", tasks))
 
-        from src.models import PlanExecuteRequest
+        from anyide.models import PlanExecuteRequest
 
         result = await pt.execute(PlanExecuteRequest(plan_id=created.plan_id))
 
@@ -305,7 +305,7 @@ class TestPlanExecuteSuccess:
         ]
         created = await pt.create(make_create_req("parallel_exec", tasks))
 
-        from src.models import PlanExecuteRequest
+        from anyide.models import PlanExecuteRequest
 
         result = await pt.execute(PlanExecuteRequest(plan_id=created.plan_id))
 
@@ -338,7 +338,7 @@ class TestPlanExecuteSuccess:
         ]
         created = await pt.create(make_create_req("ref_resolve", tasks))
 
-        from src.models import PlanExecuteRequest
+        from anyide.models import PlanExecuteRequest
 
         result = await pt.execute(PlanExecuteRequest(plan_id=created.plan_id))
 
@@ -359,7 +359,7 @@ class TestPlanExecuteSuccess:
         await conn.execute("DELETE FROM plan_plans")
         await conn.commit()
 
-        from src.models import PlanExecuteRequest
+        from anyide.models import PlanExecuteRequest
 
         created = await pt.create(make_create_req("plan_name_ref", [make_task("t1")]))
         result = await pt.execute(PlanExecuteRequest(plan_id="plan_name_ref"))
@@ -379,7 +379,7 @@ class TestPlanExecuteSuccess:
         await conn.execute("DELETE FROM plan_plans")
         await conn.commit()
 
-        from src.models import PlanExecuteRequest
+        from anyide.models import PlanExecuteRequest
 
         async def delayed_create():
             await asyncio.sleep(0.15)
@@ -426,7 +426,7 @@ class TestPlanExecuteFailurePolicies:
         ]
         created = await pt.create(make_create_req("stop_policy", tasks, on_failure="stop"))
 
-        from src.models import PlanExecuteRequest, PlanStatusRequest
+        from anyide.models import PlanExecuteRequest, PlanStatusRequest
 
         result = await pt.execute(PlanExecuteRequest(plan_id=created.plan_id))
         status = await pt.status(PlanStatusRequest(plan_id=created.plan_id))
@@ -465,7 +465,7 @@ class TestPlanExecuteFailurePolicies:
         ]
         created = await pt.create(make_create_req("skip_deps", tasks, on_failure="skip_dependents"))
 
-        from src.models import PlanExecuteRequest, PlanStatusRequest
+        from anyide.models import PlanExecuteRequest, PlanStatusRequest
 
         result = await pt.execute(PlanExecuteRequest(plan_id=created.plan_id))
         status = await pt.status(PlanStatusRequest(plan_id=created.plan_id))
@@ -500,7 +500,7 @@ class TestPlanExecuteFailurePolicies:
         ]
         created = await pt.create(make_create_req("continue_policy", tasks, on_failure="continue"))
 
-        from src.models import PlanExecuteRequest, PlanStatusRequest
+        from anyide.models import PlanExecuteRequest, PlanStatusRequest
 
         result = await pt.execute(PlanExecuteRequest(plan_id=created.plan_id))
         status = await pt.status(PlanStatusRequest(plan_id=created.plan_id))
@@ -535,7 +535,7 @@ class TestPlanExecuteFailurePolicies:
         ]
         created = await pt.create(make_create_req("per_task_override", tasks, on_failure="stop"))
 
-        from src.models import PlanExecuteRequest, PlanStatusRequest
+        from anyide.models import PlanExecuteRequest, PlanStatusRequest
 
         result = await pt.execute(PlanExecuteRequest(plan_id=created.plan_id))
         status = await pt.status(PlanStatusRequest(plan_id=created.plan_id))
@@ -553,8 +553,8 @@ class TestPlanExecuteFailurePolicies:
 class TestPlanExecuteNotFound:
     @pytest.mark.asyncio
     async def test_execute_nonexistent_plan(self, plan_tools):
-        from src.models import PlanExecuteRequest
-        from src.tools.plan_tools import PlanNotFoundError
+        from anyide.models import PlanExecuteRequest
+        from anyide.modules.plan.tools import PlanNotFoundError
 
         with pytest.raises(PlanNotFoundError):
             await plan_tools.execute(PlanExecuteRequest(plan_id="does-not-exist"))
@@ -562,7 +562,7 @@ class TestPlanExecuteNotFound:
     @pytest.mark.asyncio
     async def test_execute_plan_name_ambiguous_raises_value_error(self, plan_tools):
         """Name fallback should fail when multiple plans share the same name."""
-        from src.models import PlanExecuteRequest
+        from anyide.models import PlanExecuteRequest
 
         await plan_tools.create(make_create_req("duplicate_name", [make_task("a1")]))
         await plan_tools.create(make_create_req("duplicate_name", [make_task("a2")]))
@@ -582,7 +582,7 @@ class TestPlanExecuteNotFound:
         await conn.execute("DELETE FROM plan_plans")
         await conn.commit()
 
-        from src.models import PlanExecuteRequest
+        from anyide.models import PlanExecuteRequest
 
         created = await pt.create(make_create_req("rerun", [make_task("t1")]))
         await pt.execute(PlanExecuteRequest(plan_id=created.plan_id))
@@ -599,7 +599,7 @@ class TestPlanExecuteNotFound:
 class TestPlanStatus:
     @pytest.mark.asyncio
     async def test_status_pending_plan(self, plan_tools):
-        from src.models import PlanStatusRequest
+        from anyide.models import PlanStatusRequest
 
         created = await plan_tools.create(make_create_req("pending", [make_task("x1"), make_task("x2")]))
         status = await plan_tools.status(PlanStatusRequest(plan_id=created.plan_id))
@@ -623,7 +623,7 @@ class TestPlanStatus:
         await conn.execute("DELETE FROM plan_plans")
         await conn.commit()
 
-        from src.models import PlanExecuteRequest, PlanStatusRequest
+        from anyide.models import PlanExecuteRequest, PlanStatusRequest
 
         created = await pt.create(make_create_req("done", [make_task("q1"), make_task("q2", depends_on=["q1"])]))
         await pt.execute(PlanExecuteRequest(plan_id=created.plan_id))
@@ -649,7 +649,7 @@ class TestPlanStatus:
         await conn.execute("DELETE FROM plan_plans")
         await conn.commit()
 
-        from src.models import PlanExecuteRequest, PlanStatusRequest
+        from anyide.models import PlanExecuteRequest, PlanStatusRequest
 
         created = await pt.create(make_create_req("timestamps", [make_task("ts1")]))
         await pt.execute(PlanExecuteRequest(plan_id=created.plan_id))
@@ -663,8 +663,8 @@ class TestPlanStatus:
 
     @pytest.mark.asyncio
     async def test_status_not_found(self, plan_tools):
-        from src.models import PlanStatusRequest
-        from src.tools.plan_tools import PlanNotFoundError
+        from anyide.models import PlanStatusRequest
+        from anyide.modules.plan.tools import PlanNotFoundError
 
         with pytest.raises(PlanNotFoundError):
             await plan_tools.status(PlanStatusRequest(plan_id="no-such-plan"))
@@ -709,7 +709,7 @@ class TestPlanList:
         await conn.execute("DELETE FROM plan_plans")
         await conn.commit()
 
-        from src.models import PlanExecuteRequest
+        from anyide.models import PlanExecuteRequest
 
         created = await pt.create(make_create_req("finished", [make_task("f1")]))
         await pt.execute(PlanExecuteRequest(plan_id=created.plan_id))
@@ -727,7 +727,7 @@ class TestPlanList:
 class TestPlanCancel:
     @pytest.mark.asyncio
     async def test_cancel_pending_plan(self, plan_tools):
-        from src.models import PlanCancelRequest, PlanStatusRequest
+        from anyide.models import PlanCancelRequest, PlanStatusRequest
 
         created = await plan_tools.create(make_create_req("to_cancel", [make_task("c1"), make_task("c2")]))
         cancel_result = await plan_tools.cancel(PlanCancelRequest(plan_id=created.plan_id))
@@ -740,7 +740,7 @@ class TestPlanCancel:
 
     @pytest.mark.asyncio
     async def test_cancel_already_cancelled_raises(self, plan_tools):
-        from src.models import PlanCancelRequest
+        from anyide.models import PlanCancelRequest
 
         created = await plan_tools.create(make_create_req("cancel2", [make_task("d1")]))
         await plan_tools.cancel(PlanCancelRequest(plan_id=created.plan_id))
@@ -759,7 +759,7 @@ class TestPlanCancel:
         await conn.execute("DELETE FROM plan_plans")
         await conn.commit()
 
-        from src.models import PlanCancelRequest, PlanExecuteRequest
+        from anyide.models import PlanCancelRequest, PlanExecuteRequest
 
         created = await pt.create(make_create_req("done_cancel", [make_task("e1")]))
         await pt.execute(PlanExecuteRequest(plan_id=created.plan_id))
@@ -769,8 +769,8 @@ class TestPlanCancel:
 
     @pytest.mark.asyncio
     async def test_cancel_not_found(self, plan_tools):
-        from src.models import PlanCancelRequest
-        from src.tools.plan_tools import PlanNotFoundError
+        from anyide.models import PlanCancelRequest
+        from anyide.modules.plan.tools import PlanNotFoundError
 
         with pytest.raises(PlanNotFoundError):
             await plan_tools.cancel(PlanCancelRequest(plan_id="ghost-plan"))
@@ -807,7 +807,7 @@ class TestPlanHITL:
         await conn.execute("DELETE FROM plan_plans")
         await conn.commit()
 
-        from src.models import PlanExecuteRequest
+        from anyide.models import PlanExecuteRequest
 
         created = await pt.create(make_create_req("hitl_approved", [make_task("h1", require_hitl=True)]))
         result = await pt.execute(PlanExecuteRequest(plan_id=created.plan_id))
@@ -838,7 +838,7 @@ class TestPlanHITL:
         await conn.execute("DELETE FROM plan_plans")
         await conn.commit()
 
-        from src.models import PlanExecuteRequest, PlanStatusRequest
+        from anyide.models import PlanExecuteRequest, PlanStatusRequest
 
         created = await pt.create(make_create_req("hitl_rejected", [make_task("h2", require_hitl=True)]))
         result = await pt.execute(PlanExecuteRequest(plan_id=created.plan_id))
@@ -868,7 +868,7 @@ class TestPlanHITL:
         await conn.execute("DELETE FROM plan_plans")
         await conn.commit()
 
-        from src.models import PlanExecuteRequest, PlanStatusRequest
+        from anyide.models import PlanExecuteRequest, PlanStatusRequest
 
         created = await pt.create(make_create_req("hitl_expired", [make_task("h3", require_hitl=True)]))
         result = await pt.execute(PlanExecuteRequest(plan_id=created.plan_id))
@@ -887,7 +887,7 @@ class TestHelperFunctions:
     """Unit tests for standalone helper functions."""
 
     def test_compute_execution_levels_linear(self):
-        from src.tools.plan_tools import _compute_execution_levels
+        from anyide.modules.plan.tools import _compute_execution_levels
 
         tasks = [
             {"id": "a", "depends_on": []},
@@ -898,7 +898,7 @@ class TestHelperFunctions:
         assert levels == [["a"], ["b"], ["c"]]
 
     def test_compute_execution_levels_parallel(self):
-        from src.tools.plan_tools import _compute_execution_levels
+        from anyide.modules.plan.tools import _compute_execution_levels
 
         tasks = [
             {"id": "root", "depends_on": []},
@@ -910,7 +910,7 @@ class TestHelperFunctions:
         assert sorted(levels[1]) == ["x", "y"]
 
     def test_compute_execution_levels_detects_cycle(self):
-        from src.tools.plan_tools import PlanValidationError, _compute_execution_levels
+        from anyide.modules.plan.tools import PlanValidationError, _compute_execution_levels
 
         tasks = [
             {"id": "a", "depends_on": ["b"]},
@@ -920,14 +920,14 @@ class TestHelperFunctions:
             _compute_execution_levels(tasks)
 
     def test_compute_execution_levels_detects_missing_dep(self):
-        from src.tools.plan_tools import PlanValidationError, _compute_execution_levels
+        from anyide.modules.plan.tools import PlanValidationError, _compute_execution_levels
 
         tasks = [{"id": "a", "depends_on": ["ghost"]}]
         with pytest.raises(PlanValidationError, match="unknown task"):
             _compute_execution_levels(tasks)
 
     def test_get_transitive_dependents(self):
-        from src.tools.plan_tools import _get_transitive_dependents
+        from anyide.modules.plan.tools import _get_transitive_dependents
 
         tasks = [
             {"id": "a", "depends_on": "[]"},
@@ -942,7 +942,7 @@ class TestHelperFunctions:
         assert "a" not in deps
 
     def test_resolve_task_refs_simple(self):
-        from src.tools.plan_tools import _resolve_task_refs
+        from anyide.modules.plan.tools import _resolve_task_refs
 
         params = {"input": "{{task:t1.value}}"}
         outputs = {"t1": {"value": "hello"}}
@@ -950,14 +950,14 @@ class TestHelperFunctions:
         assert resolved["input"] == "hello"
 
     def test_resolve_task_refs_missing_task(self):
-        from src.tools.plan_tools import _resolve_task_refs
+        from anyide.modules.plan.tools import _resolve_task_refs
 
         params = {"input": "{{task:missing.field}}"}
         resolved = _resolve_task_refs(params, {})
         assert resolved["input"] == ""  # defaults to empty string
 
     def test_resolve_task_refs_nested(self):
-        from src.tools.plan_tools import _resolve_task_refs
+        from anyide.modules.plan.tools import _resolve_task_refs
 
         params = {"a": "{{task:t1.x}}", "b": "{{task:t2.y}}"}
         outputs = {"t1": {"x": "foo"}, "t2": {"y": "bar"}}
@@ -966,7 +966,7 @@ class TestHelperFunctions:
         assert resolved["b"] == "bar"
 
     def test_resolve_task_refs_dict_value(self):
-        from src.tools.plan_tools import _resolve_task_refs
+        from anyide.modules.plan.tools import _resolve_task_refs
 
         params = {"data": "{{task:t1.nested}}"}
         outputs = {"t1": {"nested": {"key": "val"}}}
@@ -983,7 +983,7 @@ class TestHelperFunctions:
 def _api_client():
     """Return a started TestClient context manager."""
     from fastapi.testclient import TestClient
-    from src.main import app
+    from anyide.main import app
 
     return TestClient(app, raise_server_exceptions=False)
 

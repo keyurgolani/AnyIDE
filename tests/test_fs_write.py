@@ -5,9 +5,9 @@ import os
 import tempfile
 import shutil
 
-from src.workspace import WorkspaceManager, SecurityError
-from src.tools.fs_tools import FilesystemTools
-from src.models import FsWriteRequest
+from anyide.core.workspace import WorkspaceManager, SecurityError
+from anyide.modules.fs.tools import FilesystemTools
+from anyide.models import FsWriteRequest
 
 
 @pytest.fixture

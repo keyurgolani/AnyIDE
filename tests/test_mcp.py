@@ -18,24 +18,24 @@ async def client():
     os.environ["DB_PATH"] = os.path.join(TEST_DATA_DIR, "hostbridge.db")
 
     # Patch config loading
-    import src.config
-    original_load = src.config.load_config
+    import anyide.config
+    original_load = anyide.config.load_config
 
     def patched_load(config_path="config.yaml"):
         cfg = original_load(config_path)
         cfg.workspace.base_dir = TEST_WORKSPACE
         return cfg
 
-    src.config.load_config = patched_load
+    anyide.config.load_config = patched_load
 
     # Now import the app and initialize database
-    from src.main import app, db, mcp, hitl_manager
+    from anyide.main import app, db, mcp, hitl_manager
 
     # Connect to database before tests
     await db.connect()
 
     # Update workspace manager base dir
-    from src import main as main_module
+    from anyide import main as main_module
     main_module.config.workspace.base_dir = TEST_WORKSPACE
     main_module.workspace_manager.base_dir = os.path.realpath(TEST_WORKSPACE)
 
@@ -55,7 +55,7 @@ async def client():
     await db.close()
 
     # Restore originals
-    src.config.load_config = original_load
+    anyide.config.load_config = original_load
 
 
 class TestMCPStreamableHTTP:
@@ -336,7 +336,7 @@ class TestMCPToolParity:
     @pytest.mark.asyncio
     async def test_openapi_mcp_tool_parity(self, client):
         """Test that OpenAPI tool operation IDs match MCP tool names."""
-        from src.main import app
+        from anyide.main import app
 
         # Get OpenAPI spec
         openapi_spec = app.openapi()

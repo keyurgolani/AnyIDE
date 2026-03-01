@@ -9,19 +9,19 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 
-# Set safe defaults before importing src.main (which initializes global services)
+# Set safe defaults before importing anyide.main (which initializes global services)
 TEST_WORKSPACE = tempfile.mkdtemp()
 TEST_DATA_DIR = tempfile.mkdtemp()
 os.environ.setdefault("WORKSPACE_BASE_DIR", TEST_WORKSPACE)
 os.environ.setdefault("DB_PATH", os.path.join(TEST_DATA_DIR, "hostbridge.db"))
 
-from src.main import app
+from anyide.main import app
 
 
 @pytest.fixture(autouse=True)
 async def connected_db():
     """Ensure app database is connected for each test."""
-    from src.main import db, hitl_manager
+    from anyide.main import db, hitl_manager
 
     await db.connect()
     await hitl_manager.start()
@@ -67,9 +67,9 @@ def setup_workspace(temp_workspace, monkeypatch):
     """Setup workspace environment."""
     monkeypatch.setenv("WORKSPACE_BASE_DIR", temp_workspace)
     # Reload config
-    from src import config as config_module
+    from anyide import config as config_module
     config_module.config = config_module.load_config()
-    from src import main as main_module
+    from anyide import main as main_module
 
     # Keep global app services aligned with test workspace.
     main_module.config.workspace.base_dir = temp_workspace
@@ -276,7 +276,7 @@ class TestGitHITLBehavior:
             # Try to commit - this should create a HITL request and wait
             # Since we don't have a HITL approver, this will hang if not handled
             # We test that the endpoint properly initiates HITL by checking behavior
-            with patch("src.main.hitl_manager") as mock_hitl:
+            with patch("anyide.main.hitl_manager") as mock_hitl:
                 mock_hitl.create_request = AsyncMock(return_value=MagicMock(id="hitl-test-id"))
                 mock_hitl.wait_for_decision = AsyncMock(return_value="rejected")
 

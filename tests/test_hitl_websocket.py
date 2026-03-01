@@ -28,19 +28,19 @@ async def test_app():
     os.environ["WORKSPACE_BASE_DIR"] = TEST_WORKSPACE
     os.environ["DB_PATH"] = os.path.join(TEST_DATA_DIR, "hostbridge.db")
 
-    import src.config
-    original_load = src.config.load_config
+    import anyide.config
+    original_load = anyide.config.load_config
 
     def patched_load(config_path="config.yaml"):
         cfg = original_load(config_path)
         cfg.workspace.base_dir = TEST_WORKSPACE
         return cfg
 
-    src.config.load_config = patched_load
+    anyide.config.load_config = patched_load
 
-    from src.main import app, db
-    from src.hitl import HITLManager
-    from src import main as main_module
+    from anyide.main import app, db
+    from anyide.core.hitl import HITLManager
+    from anyide import main as main_module
 
     # Connect database
     await db.connect()
@@ -56,7 +56,7 @@ async def test_app():
 
     await main_module.hitl_manager.stop()
     await db.close()
-    src.config.load_config = original_load
+    anyide.config.load_config = original_load
 
 
 class TestHITLWebSocketRoundtrip:
@@ -65,7 +65,7 @@ class TestHITLWebSocketRoundtrip:
     @pytest.mark.asyncio
     async def test_websocket_hitl_approve_roundtrip(self, test_app):
         """Test approving a HITL request via WebSocket."""
-        from src import main as main_module
+        from anyide import main as main_module
 
         # Create a HITL request
         request = await main_module.hitl_manager.create_request(
@@ -117,7 +117,7 @@ class TestHITLWebSocketRoundtrip:
     @pytest.mark.asyncio
     async def test_websocket_hitl_reject_roundtrip(self, test_app):
         """Test rejecting a HITL request via WebSocket."""
-        from src import main as main_module
+        from anyide import main as main_module
 
         # Create a HITL request
         request = await main_module.hitl_manager.create_request(
@@ -167,7 +167,7 @@ class TestHITLClientDisconnectResilience:
     @pytest.mark.asyncio
     async def test_pending_request_survives_disconnect(self, test_app):
         """Test that pending HITL requests survive WebSocket disconnect."""
-        from src import main as main_module
+        from anyide import main as main_module
 
         # Create a HITL request
         request = await main_module.hitl_manager.create_request(
@@ -217,7 +217,7 @@ class TestHITLClientDisconnectResilience:
     @pytest.mark.asyncio
     async def test_invalid_decision_format_handled(self, test_app):
         """Test that invalid decision formats are handled gracefully."""
-        from src import main as main_module
+        from anyide import main as main_module
 
         request = await main_module.hitl_manager.create_request(
             tool_name="write",
@@ -257,31 +257,31 @@ class TestHITLConnectionTracking:
 
     def test_increment_ws_connections(self):
         """Test incrementing WebSocket connection count."""
-        from src.admin_api import increment_ws_connections, websocket_connections
+        from anyide.admin_api import increment_ws_connections, websocket_connections
 
         initial = websocket_connections
         increment_ws_connections()
 
-        from src.admin_api import websocket_connections as new_count
+        from anyide.admin_api import websocket_connections as new_count
         assert new_count == initial + 1
 
     def test_decrement_ws_connections(self):
         """Test decrementing WebSocket connection count."""
-        from src.admin_api import decrement_ws_connections, websocket_connections
+        from anyide.admin_api import decrement_ws_connections, websocket_connections
 
         initial = websocket_connections
         decrement_ws_connections()
 
-        from src.admin_api import websocket_connections as new_count
+        from anyide.admin_api import websocket_connections as new_count
         assert new_count == max(0, initial - 1)
 
     def test_decrement_does_not_go_negative(self):
         """Test that decrement doesn't go below zero."""
-        from src.admin_api import decrement_ws_connections, websocket_connections
+        from anyide.admin_api import decrement_ws_connections, websocket_connections
 
         # Decrement many times
         for _ in range(10):
             decrement_ws_connections()
 
-        from src.admin_api import websocket_connections as new_count
+        from anyide.admin_api import websocket_connections as new_count
         assert new_count >= 0

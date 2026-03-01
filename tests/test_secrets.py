@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.secrets import SecretManager, SecretNotFoundError
+from anyide.core.secrets import SecretManager, SecretNotFoundError
 
 
 # ---------------------------------------------------------------------------

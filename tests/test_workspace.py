@@ -5,7 +5,7 @@ import tempfile
 import pytest
 from pathlib import Path
 
-from src.workspace import WorkspaceManager, SecurityError
+from anyide.core.workspace import WorkspaceManager, SecurityError
 
 
 @pytest.fixture

@@ -4,8 +4,8 @@ import pytest
 import asyncio
 from datetime import datetime
 
-from src.database import Database
-from src.hitl import HITLManager, HITLRequest
+from anyide.core.database import Database
+from anyide.core.hitl import HITLManager, HITLRequest
 
 
 @pytest.fixture

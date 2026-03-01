@@ -65,7 +65,7 @@ development/
 data/
 
 # Workspace (user data - not tracked)
-workspace/
+/workspace/
 
 # Logs
 *.log

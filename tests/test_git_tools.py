@@ -6,8 +6,8 @@ import tempfile
 import shutil
 from pathlib import Path
 
-from src.tools.git_tools import GitTools
-from src.workspace import WorkspaceManager
+from anyide.modules.git.tools import GitTools
+from anyide.core.workspace import WorkspaceManager
 
 
 @pytest.fixture

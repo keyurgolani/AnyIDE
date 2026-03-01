@@ -9,15 +9,15 @@ from fastapi import FastAPI
 from fastapi_mcp import FastApiMCP
 from httpx import ASGITransport, AsyncClient
 
-from src.audit import AuditLogger
-from src.config import Config
-from src.database import Database
-from src.hitl import HITLManager
-from src.modules import ModuleContext, ModuleRegistry, ModuleResolutionError
-from src.modules.base import ToolModule
-from src.policy import PolicyEngine
-from src.secrets import SecretManager
-from src.workspace import WorkspaceManager
+from anyide.core.audit import AuditLogger
+from anyide.config import Config
+from anyide.core.database import Database
+from anyide.core.hitl import HITLManager
+from anyide.modules import ModuleContext, ModuleRegistry, ModuleResolutionError
+from anyide.modules.base import ToolModule
+from anyide.core.policy import PolicyEngine
+from anyide.core.secrets import SecretManager
+from anyide.core.workspace import WorkspaceManager
 
 
 async def _noop_dispatch(_category: str, _name: str, _params: dict) -> dict:

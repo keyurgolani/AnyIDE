@@ -26,7 +26,7 @@ except ImportError:
 
 def get_openapi_spec():
     """Get the OpenAPI spec from the running application."""
-    temp_root = Path(tempfile.gettempdir()) / "hostbridge-tool-docs"
+    temp_root = Path(tempfile.gettempdir()) / "anyide-tool-docs"
     temp_root.mkdir(parents=True, exist_ok=True)
 
     # Ensure script can run outside containerized /data defaults.
@@ -38,7 +38,7 @@ def get_openapi_spec():
     if "DB_PATH" not in os.environ:
         data_dir = temp_root / "data"
         data_dir.mkdir(parents=True, exist_ok=True)
-        os.environ["DB_PATH"] = str(data_dir / "hostbridge.db")
+        os.environ["DB_PATH"] = str(data_dir / "anyide.db")
 
     warnings.filterwarnings(
         "ignore",
@@ -48,14 +48,14 @@ def get_openapi_spec():
 
     # Suppress app startup logs so stdout remains pure markdown.
     with contextlib.redirect_stdout(io.StringIO()):
-        from src.main import app
+        from anyide.main import app
         return app.openapi()
 
 
 def generate_markdown_doc(spec):
     """Generate markdown documentation from OpenAPI spec."""
     lines = []
-    lines.append("# HostBridge Tool Catalog\n")
+    lines.append("# AnyIDE Tool Catalog\n")
     lines.append("Auto-generated documentation for all available tools.\n")
     lines.append(f"**Generated from:** OpenAPI spec\n")
     lines.append(f"**Version:** {spec.get('info', {}).get('version', 'Unknown')}\n")

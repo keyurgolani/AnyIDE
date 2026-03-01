@@ -22,8 +22,8 @@ def workspace_dir():
 @pytest.mark.asyncio
 async def test_fs_write_config_file_requires_hitl():
     """Test that writing to config files requires HITL approval."""
-    from src.config import load_config
-    from src.policy import PolicyEngine
+    from anyide.config import load_config
+    from anyide.core.policy import PolicyEngine
     
     config = load_config()
     policy_engine = PolicyEngine(config)
@@ -42,8 +42,8 @@ async def test_fs_write_config_file_requires_hitl():
 @pytest.mark.asyncio
 async def test_fs_write_env_file_requires_hitl():
     """Test that writing to .env files requires HITL approval."""
-    from src.config import load_config
-    from src.policy import PolicyEngine
+    from anyide.config import load_config
+    from anyide.core.policy import PolicyEngine
     
     config = load_config()
     policy_engine = PolicyEngine(config)
@@ -61,8 +61,8 @@ async def test_fs_write_env_file_requires_hitl():
 @pytest.mark.asyncio
 async def test_fs_write_yaml_file_requires_hitl():
     """Test that writing to YAML files requires HITL approval."""
-    from src.config import load_config
-    from src.policy import PolicyEngine
+    from anyide.config import load_config
+    from anyide.core.policy import PolicyEngine
     
     config = load_config()
     policy_engine = PolicyEngine(config)
@@ -80,8 +80,8 @@ async def test_fs_write_yaml_file_requires_hitl():
 @pytest.mark.asyncio
 async def test_fs_write_regular_file_allowed():
     """Test that writing to regular files is allowed."""
-    from src.config import load_config
-    from src.policy import PolicyEngine
+    from anyide.config import load_config
+    from anyide.core.policy import PolicyEngine
     
     config = load_config()
     policy_engine = PolicyEngine(config)
@@ -99,8 +99,8 @@ async def test_fs_write_regular_file_allowed():
 @pytest.mark.asyncio
 async def test_fs_write_binary_file_blocked():
     """Test that writing to binary files is blocked."""
-    from src.config import load_config
-    from src.policy import PolicyEngine
+    from anyide.config import load_config
+    from anyide.core.policy import PolicyEngine
     
     config = load_config()
     policy_engine = PolicyEngine(config)
@@ -118,11 +118,11 @@ async def test_fs_write_binary_file_blocked():
 @pytest.mark.asyncio
 async def test_hitl_workflow_approve(workspace_dir):
     """Test complete HITL workflow with approval."""
-    from src.database import Database
-    from src.hitl import HITLManager
-    from src.workspace import WorkspaceManager
-    from src.tools.fs_tools import FilesystemTools
-    from src.models import FsWriteRequest
+    from anyide.core.database import Database
+    from anyide.core.hitl import HITLManager
+    from anyide.core.workspace import WorkspaceManager
+    from anyide.modules.fs.tools import FilesystemTools
+    from anyide.models import FsWriteRequest
     
     # Setup
     db = Database(":memory:")
@@ -176,8 +176,8 @@ async def test_hitl_workflow_approve(workspace_dir):
 @pytest.mark.asyncio
 async def test_hitl_workflow_reject(workspace_dir):
     """Test complete HITL workflow with rejection."""
-    from src.database import Database
-    from src.hitl import HITLManager
+    from anyide.core.database import Database
+    from anyide.core.hitl import HITLManager
     
     # Setup
     db = Database(":memory:")
@@ -219,8 +219,8 @@ async def test_hitl_workflow_reject(workspace_dir):
 @pytest.mark.asyncio
 async def test_hitl_workflow_timeout(workspace_dir):
     """Test HITL workflow with timeout."""
-    from src.database import Database
-    from src.hitl import HITLManager
+    from anyide.core.database import Database
+    from anyide.core.hitl import HITLManager
     
     # Setup
     db = Database(":memory:")
@@ -253,8 +253,8 @@ async def test_hitl_workflow_timeout(workspace_dir):
 @pytest.mark.asyncio
 async def test_multiple_hitl_requests_independent():
     """Test that multiple HITL requests work independently."""
-    from src.database import Database
-    from src.hitl import HITLManager
+    from anyide.core.database import Database
+    from anyide.core.hitl import HITLManager
     
     # Setup
     db = Database(":memory:")

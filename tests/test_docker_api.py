@@ -7,19 +7,19 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 from unittest.mock import AsyncMock, MagicMock, patch
 
-# Set safe defaults before importing src.main (which initializes global services)
+# Set safe defaults before importing anyide.main (which initializes global services)
 TEST_WORKSPACE = tempfile.mkdtemp()
 TEST_DATA_DIR = tempfile.mkdtemp()
 os.environ.setdefault("WORKSPACE_BASE_DIR", TEST_WORKSPACE)
 os.environ.setdefault("DB_PATH", os.path.join(TEST_DATA_DIR, "hostbridge.db"))
 
-from src.main import app
+from anyide.main import app
 
 
 @pytest.fixture(autouse=True)
 async def connected_db():
     """Ensure app database is connected for each test."""
-    from src.main import db
+    from anyide.main import db
 
     await db.connect()
     try:
@@ -31,7 +31,7 @@ async def connected_db():
 @pytest.fixture
 def mock_docker_tools():
     """Mock Docker tools."""
-    import src.main as main_module
+    import anyide.main as main_module
 
     docker_module = main_module.module_registry.modules.get("docker")
     assert docker_module is not None, "docker module must be loaded for docker API tests"
@@ -50,7 +50,7 @@ def mock_docker_tools():
 async def test_docker_list_endpoint(mock_docker_tools):
     """Test docker_list endpoint."""
     # Mock response
-    from src.models import DockerListResponse
+    from anyide.models import DockerListResponse
     mock_docker_tools.list_containers = AsyncMock(return_value=DockerListResponse(
         containers=[
             {
@@ -85,7 +85,7 @@ async def test_docker_list_endpoint(mock_docker_tools):
 @pytest.mark.asyncio
 async def test_docker_inspect_endpoint(mock_docker_tools):
     """Test docker_inspect endpoint."""
-    from src.models import DockerInspectResponse
+    from anyide.models import DockerInspectResponse
     mock_docker_tools.inspect_container = AsyncMock(return_value=DockerInspectResponse(
         id="abc123",
         name="test-container",
@@ -117,7 +117,7 @@ async def test_docker_inspect_endpoint(mock_docker_tools):
 @pytest.mark.asyncio
 async def test_docker_logs_endpoint(mock_docker_tools):
     """Test docker_logs endpoint."""
-    from src.models import DockerLogsResponse
+    from anyide.models import DockerLogsResponse
     mock_docker_tools.get_logs = AsyncMock(return_value=DockerLogsResponse(
         logs="Log line 1\nLog line 2\n",
         container="test-container",
@@ -143,10 +143,10 @@ async def test_docker_logs_endpoint(mock_docker_tools):
 @pytest.mark.asyncio
 async def test_docker_action_endpoint_requires_hitl(mock_docker_tools):
     """Test docker_action endpoint requires HITL."""
-    from src.models import DockerActionResponse
+    from anyide.models import DockerActionResponse
     
     # Mock HITL manager to auto-approve
-    with patch('src.main.hitl_manager') as mock_hitl:
+    with patch('anyide.main.hitl_manager') as mock_hitl:
         mock_hitl.create_request = AsyncMock(return_value=MagicMock(id="hitl-test-id"))
         mock_hitl.wait_for_decision = AsyncMock(return_value=("approved", None))
         
@@ -180,7 +180,7 @@ async def test_docker_action_endpoint_requires_hitl(mock_docker_tools):
 @pytest.mark.asyncio
 async def test_docker_list_sub_app_endpoint(mock_docker_tools):
     """Test docker_list sub-app endpoint."""
-    from src.models import DockerListResponse
+    from anyide.models import DockerListResponse
     mock_docker_tools.list_containers = AsyncMock(return_value=DockerListResponse(
         containers=[],
         total_count=0,

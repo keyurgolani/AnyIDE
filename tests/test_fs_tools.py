@@ -5,9 +5,9 @@ import tempfile
 import pytest
 from pathlib import Path
 
-from src.workspace import WorkspaceManager, SecurityError
-from src.tools.fs_tools import FilesystemTools
-from src.models import FsReadRequest
+from anyide.core.workspace import WorkspaceManager, SecurityError
+from anyide.modules.fs.tools import FilesystemTools
+from anyide.models import FsReadRequest
 
 
 @pytest.fixture

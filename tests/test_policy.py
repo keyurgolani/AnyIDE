@@ -1,8 +1,8 @@
 """Tests for policy enforcement."""
 
 import pytest
-from src.config import Config, ToolPolicyConfig
-from src.policy import PolicyEngine
+from anyide.config import Config, ToolPolicyConfig
+from anyide.core.policy import PolicyEngine
 
 
 @pytest.fixture

@@ -23,23 +23,23 @@ async def client():
     os.environ["DB_PATH"] = os.path.join(TEST_DATA_DIR, "hostbridge.db")
 
     # Patch config loading
-    import src.config
-    original_load = src.config.load_config
+    import anyide.config
+    original_load = anyide.config.load_config
 
     def patched_load(config_path="config.yaml"):
         cfg = original_load(config_path)
         cfg.workspace.base_dir = TEST_WORKSPACE
         return cfg
 
-    src.config.load_config = patched_load
+    anyide.config.load_config = patched_load
 
     # Now import the app and initialize database
-    from src.main import app, db
+    from anyide.main import app, db
 
     # Connect to database before tests
     await db.connect()
 
-    from src import main as main_module
+    from anyide import main as main_module
     main_module.config.workspace.base_dir = TEST_WORKSPACE
     main_module.workspace_manager.base_dir = os.path.realpath(TEST_WORKSPACE)
 
@@ -53,7 +53,7 @@ async def client():
     await db.close()
 
     # Restore originals
-    src.config.load_config = original_load
+    anyide.config.load_config = original_load
 
 
 @pytest.fixture
@@ -409,33 +409,33 @@ class TestWebSocketConnectionTracking:
 
     def test_increment_ws_connections(self):
         """Test incrementing WebSocket connection count."""
-        from src.admin_api import increment_ws_connections, websocket_connections
+        from anyide.admin_api import increment_ws_connections, websocket_connections
 
         initial = websocket_connections
         increment_ws_connections()
 
-        from src.admin_api import websocket_connections as new_count
+        from anyide.admin_api import websocket_connections as new_count
         assert new_count == initial + 1
 
     def test_decrement_ws_connections(self):
         """Test decrementing WebSocket connection count."""
-        from src.admin_api import decrement_ws_connections, websocket_connections
+        from anyide.admin_api import decrement_ws_connections, websocket_connections
 
         initial = websocket_connections
         decrement_ws_connections()
 
-        from src.admin_api import websocket_connections as new_count
+        from anyide.admin_api import websocket_connections as new_count
         assert new_count == max(0, initial - 1)
 
     def test_decrement_does_not_go_negative(self):
         """Test that decrement doesn't go below zero."""
-        from src.admin_api import decrement_ws_connections, websocket_connections
+        from anyide.admin_api import decrement_ws_connections, websocket_connections
 
         # Decrement many times
         for _ in range(10):
             decrement_ws_connections()
 
-        from src.admin_api import websocket_connections as new_count
+        from anyide.admin_api import websocket_connections as new_count
         assert new_count >= 0
 
 

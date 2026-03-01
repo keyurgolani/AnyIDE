@@ -511,16 +511,25 @@ http://localhost:8080/admin/
 
 ```
 .
-├── src/                    # Python backend
+├── anyide/                # Python backend
 │   ├── main.py            # FastAPI app
-│   ├── hitl.py            # HITL manager
-│   ├── audit.py           # Audit logger
-│   ├── policy.py          # Policy engine
-│   ├── workspace.py       # Path resolution
-│   ├── secrets.py         # Secret manager (template resolver)
-│   ├── admin_api.py       # Admin API
-│   └── tools/             # Tool implementations
-│       ├── http_tools.py  # HTTP client with SSRF protection
+│   ├── config.py          # App configuration models/loader
+│   ├── models.py          # Request/response models
+│   ├── admin_api.py       # Admin API routes
+│   ├── logging_config.py  # Structured logging setup
+│   ├── core/              # Shared runtime infrastructure
+│   │   ├── audit.py       # Audit logger
+│   │   ├── database.py    # SQLite access
+│   │   ├── hitl.py        # HITL manager
+│   │   ├── policy.py      # Policy engine
+│   │   ├── secrets.py     # Secret resolver
+│   │   └── workspace.py   # Workspace/path security
+│   └── modules/           # Plug-and-play tool modules
+│       ├── registry.py
+│       ├── base.py
+│       ├── fs/
+│       │   ├── module.py
+│       │   └── tools.py
 │       └── ...
 ├── admin/                 # React dashboard
 │   ├── src/
@@ -583,7 +592,7 @@ pytest --collect-only -q
 
 ```bash
 # Backend
-python -m uvicorn src.main:app --reload
+python -m uvicorn anyide.main:app --reload
 
 # Frontend (separate terminal)
 cd admin

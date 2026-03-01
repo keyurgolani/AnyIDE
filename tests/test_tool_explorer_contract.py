@@ -25,20 +25,20 @@ async def client():
     os.environ["WORKSPACE_BASE_DIR"] = TEST_WORKSPACE
     os.environ["DB_PATH"] = os.path.join(TEST_DATA_DIR, "hostbridge.db")
 
-    import src.config
-    original_load = src.config.load_config
+    import anyide.config
+    original_load = anyide.config.load_config
 
     def patched_load(config_path="config.yaml"):
         cfg = original_load(config_path)
         cfg.workspace.base_dir = TEST_WORKSPACE
         return cfg
 
-    src.config.load_config = patched_load
+    anyide.config.load_config = patched_load
 
-    from src.main import app, db
+    from anyide.main import app, db
     await db.connect()
 
-    from src import main as main_module
+    from anyide import main as main_module
     main_module.config.workspace.base_dir = TEST_WORKSPACE
     main_module.workspace_manager.base_dir = os.path.realpath(TEST_WORKSPACE)
 
@@ -49,7 +49,7 @@ async def client():
         yield ac
 
     await db.close()
-    src.config.load_config = original_load
+    anyide.config.load_config = original_load
 
 
 @pytest.fixture

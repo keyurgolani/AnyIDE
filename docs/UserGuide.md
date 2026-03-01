@@ -206,7 +206,7 @@ Read file contents with optional line ranges and encoding support.
 curl -X POST http://localhost:8080/api/tools/fs/read \
   -H "Content-Type: application/json" \
   -d '{
-    "path": "src/main.py",
+    "path": "anyide/main.py",
     "start_line": 1,
     "end_line": 50,
     "encoding": "utf-8"
@@ -259,7 +259,7 @@ List directory contents with recursive traversal and filtering.
 **Natural Language Examples**:
 - "List all files in the current directory"
 - "Show me all Python files recursively"
-- "List files in src/components up to 2 levels deep"
+- "List files in anyide/components up to 2 levels deep"
 
 **API Call**:
 ```bash

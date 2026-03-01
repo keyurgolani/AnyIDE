@@ -35,18 +35,18 @@ os.environ["DB_PATH"] = os.path.join(TEST_DATA_DIR, "hostbridge.db")
 async def client():
     """Create test client."""
     # Patch config loading
-    import src.config
-    original_load = src.config.load_config
+    import anyide.config
+    original_load = anyide.config.load_config
 
     def patched_load(config_path="config.yaml"):
         cfg = original_load(config_path)
         cfg.workspace.base_dir = TEST_WORKSPACE
         return cfg
 
-    src.config.load_config = patched_load
+    anyide.config.load_config = patched_load
 
     # Now import the app and initialize database
-    from src.main import app, db
+    from anyide.main import app, db
 
     # Connect to database before tests
     await db.connect()
@@ -58,7 +58,7 @@ async def client():
     await db.close()
 
     # Restore originals
-    src.config.load_config = original_load
+    anyide.config.load_config = original_load
 
 
 @pytest.fixture

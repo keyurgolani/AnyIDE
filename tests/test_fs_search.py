@@ -2,9 +2,9 @@
 
 import os
 import pytest
-from src.tools.fs_tools import FilesystemTools
-from src.workspace import WorkspaceManager
-from src.models import FsSearchRequest
+from anyide.modules.fs.tools import FilesystemTools
+from anyide.core.workspace import WorkspaceManager
+from anyide.models import FsSearchRequest
 
 
 @pytest.fixture

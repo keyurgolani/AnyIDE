@@ -27,24 +27,24 @@ os.environ["DB_PATH"] = os.path.join(TEST_DATA_DIR, "hostbridge.db")
 @pytest.fixture
 async def client():
     """Create test client."""
-    import src.config
-    original_load = src.config.load_config
+    import anyide.config
+    original_load = anyide.config.load_config
 
     def patched_load(config_path="config.yaml"):
         cfg = original_load(config_path)
         cfg.workspace.base_dir = TEST_WORKSPACE
         return cfg
 
-    src.config.load_config = patched_load
+    anyide.config.load_config = patched_load
 
-    from src.main import app, db
+    from anyide.main import app, db
     await db.connect()
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
     await db.close()
-    src.config.load_config = original_load
+    anyide.config.load_config = original_load
 
 
 class TestConcurrentAccess:

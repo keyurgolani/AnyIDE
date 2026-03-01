@@ -2,9 +2,9 @@
 
 import os
 import pytest
-from src.tools.shell_tools import ShellTools
-from src.workspace import WorkspaceManager, SecurityError
-from src.models import ShellExecuteRequest
+from anyide.modules.shell.tools import ShellTools
+from anyide.core.workspace import WorkspaceManager, SecurityError
+from anyide.models import ShellExecuteRequest
 
 
 @pytest.fixture

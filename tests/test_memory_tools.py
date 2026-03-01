@@ -26,7 +26,7 @@ os.environ["WORKSPACE_BASE_DIR"] = _TEST_WORKSPACE
 @pytest_asyncio.fixture(scope="module")
 async def memory_db():
     """A connected Database instance used for unit-level MemoryTools tests."""
-    from src.database import Database
+    from anyide.core.database import Database
 
     db = Database(_TEST_DB_PATH)
     await db.connect()
@@ -37,7 +37,7 @@ async def memory_db():
 @pytest_asyncio.fixture
 async def memory_tools(memory_db):
     """Fresh MemoryTools instance (but reuses the same DB connection)."""
-    from src.tools.memory_tools import MemoryTools
+    from anyide.modules.memory.tools import MemoryTools
 
     # Wipe tables before each test for isolation
     conn = memory_db.connection
@@ -59,7 +59,7 @@ class TestMemoryStore:
     @pytest.mark.asyncio
     async def test_store_minimal(self, memory_tools):
         """Store with content only generates a node with defaults."""
-        from src.models import MemoryStoreRequest
+        from anyide.models import MemoryStoreRequest
 
         req = MemoryStoreRequest(content="Python is a programming language")
         result = await memory_tools.store(req)
@@ -72,7 +72,7 @@ class TestMemoryStore:
     @pytest.mark.asyncio
     async def test_store_with_name(self, memory_tools):
         """Explicit name overrides content-derived name."""
-        from src.models import MemoryStoreRequest
+        from anyide.models import MemoryStoreRequest
 
         req = MemoryStoreRequest(content="Long content here", name="My Node")
         result = await memory_tools.store(req)
@@ -82,7 +82,7 @@ class TestMemoryStore:
     @pytest.mark.asyncio
     async def test_store_name_truncated_to_60_chars(self, memory_tools):
         """Content longer than 60 chars is truncated for the auto-name."""
-        from src.models import MemoryStoreRequest
+        from anyide.models import MemoryStoreRequest
 
         content = "A" * 80
         req = MemoryStoreRequest(content=content)
@@ -93,7 +93,7 @@ class TestMemoryStore:
     @pytest.mark.asyncio
     async def test_store_with_tags_and_metadata(self, memory_tools):
         """Tags and metadata are persisted correctly."""
-        from src.models import MemoryStoreRequest, MemoryGetRequest
+        from anyide.models import MemoryStoreRequest, MemoryGetRequest
 
         req = MemoryStoreRequest(
             content="Test node",
@@ -112,7 +112,7 @@ class TestMemoryStore:
     @pytest.mark.asyncio
     async def test_store_with_relations(self, memory_tools):
         """Storing with relations creates edges to existing nodes."""
-        from src.models import MemoryStoreRequest, MemoryStoreRelation
+        from anyide.models import MemoryStoreRequest, MemoryStoreRelation
 
         # Create a target node first
         target = await memory_tools.store(MemoryStoreRequest(content="Target node"))
@@ -128,8 +128,8 @@ class TestMemoryStore:
     @pytest.mark.asyncio
     async def test_store_with_invalid_relation_target_raises(self, memory_tools):
         """Referencing a non-existent target ID raises NodeNotFoundError."""
-        from src.models import MemoryStoreRequest, MemoryStoreRelation
-        from src.tools.memory_tools import NodeNotFoundError
+        from anyide.models import MemoryStoreRequest, MemoryStoreRelation
+        from anyide.modules.memory.tools import NodeNotFoundError
 
         req = MemoryStoreRequest(
             content="Source node",
@@ -149,7 +149,7 @@ class TestMemoryGet:
     @pytest.mark.asyncio
     async def test_get_existing_node(self, memory_tools):
         """Retrieving a stored node returns full node details."""
-        from src.models import MemoryStoreRequest, MemoryGetRequest
+        from anyide.models import MemoryStoreRequest, MemoryGetRequest
 
         stored = await memory_tools.store(MemoryStoreRequest(
             content="Knowledge about Python", name="Python node"
@@ -163,8 +163,8 @@ class TestMemoryGet:
     @pytest.mark.asyncio
     async def test_get_nonexistent_raises(self, memory_tools):
         """Retrieving a non-existent node raises NodeNotFoundError."""
-        from src.models import MemoryGetRequest
-        from src.tools.memory_tools import NodeNotFoundError
+        from anyide.models import MemoryGetRequest
+        from anyide.modules.memory.tools import NodeNotFoundError
 
         with pytest.raises(NodeNotFoundError):
             await memory_tools.get(MemoryGetRequest(id="does-not-exist"))
@@ -172,7 +172,7 @@ class TestMemoryGet:
     @pytest.mark.asyncio
     async def test_get_includes_outgoing_relations(self, memory_tools):
         """Relations include outgoing edges."""
-        from src.models import MemoryStoreRequest, MemoryStoreRelation, MemoryGetRequest
+        from anyide.models import MemoryStoreRequest, MemoryStoreRelation, MemoryGetRequest
 
         target = await memory_tools.store(MemoryStoreRequest(content="Target"))
         source = await memory_tools.store(MemoryStoreRequest(
@@ -189,7 +189,7 @@ class TestMemoryGet:
     @pytest.mark.asyncio
     async def test_get_includes_incoming_relations(self, memory_tools):
         """Relations include incoming edges."""
-        from src.models import MemoryStoreRequest, MemoryStoreRelation, MemoryGetRequest
+        from anyide.models import MemoryStoreRequest, MemoryStoreRelation, MemoryGetRequest
 
         target = await memory_tools.store(MemoryStoreRequest(content="Target"))
         await memory_tools.store(MemoryStoreRequest(
@@ -205,7 +205,7 @@ class TestMemoryGet:
     @pytest.mark.asyncio
     async def test_get_without_relations(self, memory_tools):
         """include_relations=False returns empty relations list."""
-        from src.models import MemoryStoreRequest, MemoryGetRequest
+        from anyide.models import MemoryStoreRequest, MemoryGetRequest
 
         stored = await memory_tools.store(MemoryStoreRequest(content="Solo node"))
         result = await memory_tools.get(MemoryGetRequest(id=stored.id, include_relations=False))
@@ -223,7 +223,7 @@ class TestMemorySearch:
     @pytest.mark.asyncio
     async def test_fulltext_search_finds_matching_node(self, memory_tools):
         """Full-text search returns nodes matching the query."""
-        from src.models import MemoryStoreRequest, MemorySearchRequest
+        from anyide.models import MemoryStoreRequest, MemorySearchRequest
 
         await memory_tools.store(MemoryStoreRequest(
             content="Machine learning is a subset of artificial intelligence",
@@ -243,7 +243,7 @@ class TestMemorySearch:
     @pytest.mark.asyncio
     async def test_tag_search(self, memory_tools):
         """Tags-only search filters by exact tag values."""
-        from src.models import MemoryStoreRequest, MemorySearchRequest
+        from anyide.models import MemoryStoreRequest, MemorySearchRequest
 
         await memory_tools.store(MemoryStoreRequest(
             content="Python tutorial", tags=["python", "tutorial"]
@@ -264,7 +264,7 @@ class TestMemorySearch:
     @pytest.mark.asyncio
     async def test_search_entity_type_filter(self, memory_tools):
         """entity_type filter narrows search results."""
-        from src.models import MemoryStoreRequest, MemorySearchRequest
+        from anyide.models import MemoryStoreRequest, MemorySearchRequest
 
         await memory_tools.store(MemoryStoreRequest(
             content="Deploy the app", entity_type="task"
@@ -284,7 +284,7 @@ class TestMemorySearch:
     @pytest.mark.asyncio
     async def test_search_max_results_respected(self, memory_tools):
         """max_results caps the number of returned results."""
-        from src.models import MemoryStoreRequest, MemorySearchRequest
+        from anyide.models import MemoryStoreRequest, MemorySearchRequest
 
         for i in range(6):
             await memory_tools.store(MemoryStoreRequest(
@@ -302,7 +302,7 @@ class TestMemorySearch:
     @pytest.mark.asyncio
     async def test_search_empty_graph_returns_empty(self, memory_tools):
         """Searching an empty graph returns zero results."""
-        from src.models import MemorySearchRequest
+        from anyide.models import MemorySearchRequest
 
         result = await memory_tools.search(MemorySearchRequest(query="anything"))
         assert result.total_matches == 0
@@ -311,7 +311,7 @@ class TestMemorySearch:
     @pytest.mark.asyncio
     async def test_fulltext_search_handles_natural_language_question_for_full_name(self, memory_tools):
         """Question-shaped queries should still match person names in stored memory."""
-        from src.models import MemoryStoreRequest, MemorySearchRequest
+        from anyide.models import MemoryStoreRequest, MemorySearchRequest
 
         await memory_tools.store(MemoryStoreRequest(
             content="I am Keyur Golani and I own a Honda Accord Hybrid car.",
@@ -328,7 +328,7 @@ class TestMemorySearch:
     @pytest.mark.asyncio
     async def test_fulltext_search_handles_natural_language_question_for_single_name(self, memory_tools):
         """Question-shaped queries should match even when wrapped around a single keyword."""
-        from src.models import MemoryStoreRequest, MemorySearchRequest
+        from anyide.models import MemoryStoreRequest, MemorySearchRequest
 
         await memory_tools.store(MemoryStoreRequest(
             content="Keyur likes Honda cars.",
@@ -353,7 +353,7 @@ class TestMemoryUpdate:
     @pytest.mark.asyncio
     async def test_update_content(self, memory_tools):
         """Updating content changes the stored value."""
-        from src.models import MemoryStoreRequest, MemoryUpdateRequest, MemoryGetRequest
+        from anyide.models import MemoryStoreRequest, MemoryUpdateRequest, MemoryGetRequest
 
         stored = await memory_tools.store(MemoryStoreRequest(content="Old content"))
         result = await memory_tools.update(MemoryUpdateRequest(
@@ -367,7 +367,7 @@ class TestMemoryUpdate:
     @pytest.mark.asyncio
     async def test_update_metadata_merged(self, memory_tools):
         """Metadata update merges with existing keys."""
-        from src.models import MemoryStoreRequest, MemoryUpdateRequest, MemoryGetRequest
+        from anyide.models import MemoryStoreRequest, MemoryUpdateRequest, MemoryGetRequest
 
         stored = await memory_tools.store(MemoryStoreRequest(
             content="Node", metadata={"key1": "val1", "key2": "val2"}
@@ -384,8 +384,8 @@ class TestMemoryUpdate:
     @pytest.mark.asyncio
     async def test_update_nonexistent_raises(self, memory_tools):
         """Updating a non-existent node raises NodeNotFoundError."""
-        from src.models import MemoryUpdateRequest
-        from src.tools.memory_tools import NodeNotFoundError
+        from anyide.models import MemoryUpdateRequest
+        from anyide.modules.memory.tools import NodeNotFoundError
 
         with pytest.raises(NodeNotFoundError):
             await memory_tools.update(MemoryUpdateRequest(id="no-such-id", content="x"))
@@ -401,8 +401,8 @@ class TestMemoryDelete:
     @pytest.mark.asyncio
     async def test_delete_node(self, memory_tools):
         """Deleting a node removes it from the graph."""
-        from src.models import MemoryStoreRequest, MemoryDeleteRequest, MemoryGetRequest
-        from src.tools.memory_tools import NodeNotFoundError
+        from anyide.models import MemoryStoreRequest, MemoryDeleteRequest, MemoryGetRequest
+        from anyide.modules.memory.tools import NodeNotFoundError
 
         stored = await memory_tools.store(MemoryStoreRequest(content="To be deleted"))
         result = await memory_tools.delete(MemoryDeleteRequest(id=stored.id))
@@ -415,7 +415,7 @@ class TestMemoryDelete:
     @pytest.mark.asyncio
     async def test_delete_counts_edges(self, memory_tools):
         """deleted_edges count reflects actual edges removed."""
-        from src.models import MemoryStoreRequest, MemoryStoreRelation, MemoryDeleteRequest
+        from anyide.models import MemoryStoreRequest, MemoryStoreRelation, MemoryDeleteRequest
 
         target = await memory_tools.store(MemoryStoreRequest(content="Target"))
         source = await memory_tools.store(MemoryStoreRequest(
@@ -429,7 +429,7 @@ class TestMemoryDelete:
     @pytest.mark.asyncio
     async def test_delete_lists_orphaned_children(self, memory_tools):
         """Deleting a parent lists orphaned children when cascade=false."""
-        from src.models import MemoryStoreRequest, MemoryLinkRequest, MemoryDeleteRequest
+        from anyide.models import MemoryStoreRequest, MemoryLinkRequest, MemoryDeleteRequest
 
         parent = await memory_tools.store(MemoryStoreRequest(content="Parent"))
         child = await memory_tools.store(MemoryStoreRequest(content="Child"))
@@ -444,8 +444,8 @@ class TestMemoryDelete:
     @pytest.mark.asyncio
     async def test_delete_nonexistent_raises(self, memory_tools):
         """Deleting a non-existent node raises NodeNotFoundError."""
-        from src.models import MemoryDeleteRequest
-        from src.tools.memory_tools import NodeNotFoundError
+        from anyide.models import MemoryDeleteRequest
+        from anyide.modules.memory.tools import NodeNotFoundError
 
         with pytest.raises(NodeNotFoundError):
             await memory_tools.delete(MemoryDeleteRequest(id="ghost"))
@@ -461,7 +461,7 @@ class TestMemoryLink:
     @pytest.mark.asyncio
     async def test_link_creates_edge(self, memory_tools):
         """Creating a link returns created=True and an edge ID."""
-        from src.models import MemoryStoreRequest, MemoryLinkRequest
+        from anyide.models import MemoryStoreRequest, MemoryLinkRequest
 
         a = await memory_tools.store(MemoryStoreRequest(content="Node A"))
         b = await memory_tools.store(MemoryStoreRequest(content="Node B"))
@@ -477,7 +477,7 @@ class TestMemoryLink:
     @pytest.mark.asyncio
     async def test_link_update_existing_returns_created_false(self, memory_tools):
         """Linking the same pair again returns created=False (update)."""
-        from src.models import MemoryStoreRequest, MemoryLinkRequest
+        from anyide.models import MemoryStoreRequest, MemoryLinkRequest
 
         a = await memory_tools.store(MemoryStoreRequest(content="A"))
         b = await memory_tools.store(MemoryStoreRequest(content="B"))
@@ -494,7 +494,7 @@ class TestMemoryLink:
     @pytest.mark.asyncio
     async def test_link_bidirectional_creates_two_edges(self, memory_tools):
         """bidirectional=True creates both directions."""
-        from src.models import MemoryStoreRequest, MemoryLinkRequest, MemoryGetRequest
+        from anyide.models import MemoryStoreRequest, MemoryLinkRequest, MemoryGetRequest
 
         a = await memory_tools.store(MemoryStoreRequest(content="A"))
         b = await memory_tools.store(MemoryStoreRequest(content="B"))
@@ -516,8 +516,8 @@ class TestMemoryLink:
     @pytest.mark.asyncio
     async def test_link_nonexistent_source_raises(self, memory_tools):
         """Linking from a non-existent source raises NodeNotFoundError."""
-        from src.models import MemoryStoreRequest, MemoryLinkRequest
-        from src.tools.memory_tools import NodeNotFoundError
+        from anyide.models import MemoryStoreRequest, MemoryLinkRequest
+        from anyide.modules.memory.tools import NodeNotFoundError
 
         b = await memory_tools.store(MemoryStoreRequest(content="B"))
         with pytest.raises(NodeNotFoundError):
@@ -543,7 +543,7 @@ class TestGraphTraversal:
             └── child2
         All connected via parent_of edges.
         """
-        from src.models import MemoryStoreRequest, MemoryLinkRequest
+        from anyide.models import MemoryStoreRequest, MemoryLinkRequest
 
         root = await memory_tools.store(MemoryStoreRequest(content="root", name="root"))
         child1 = await memory_tools.store(MemoryStoreRequest(content="child1", name="child1"))
@@ -566,7 +566,7 @@ class TestGraphTraversal:
     @pytest.mark.asyncio
     async def test_children_returns_immediate_children(self, memory_tools, tree):
         """memory_children returns direct children only."""
-        from src.models import MemoryChildrenRequest
+        from anyide.models import MemoryChildrenRequest
 
         result = await memory_tools.children(MemoryChildrenRequest(id=tree["root"].id))
         ids = {n.id for n in result.nodes}
@@ -578,7 +578,7 @@ class TestGraphTraversal:
     @pytest.mark.asyncio
     async def test_ancestors_returns_all_ancestors(self, memory_tools, tree):
         """memory_ancestors returns all ancestors up to max_depth."""
-        from src.models import MemoryAncestorsRequest
+        from anyide.models import MemoryAncestorsRequest
 
         result = await memory_tools.ancestors(MemoryAncestorsRequest(id=tree["gc"].id))
         ids = {n.id for n in result.nodes}
@@ -598,7 +598,7 @@ class TestGraphTraversal:
     @pytest.mark.asyncio
     async def test_related_returns_connected_nodes(self, memory_tools, tree):
         """memory_related returns all directly connected nodes (any edge type)."""
-        from src.models import MemoryRelatedRequest
+        from anyide.models import MemoryRelatedRequest
 
         result = await memory_tools.related(MemoryRelatedRequest(id=tree["root"].id))
         ids = {n.id for n in result.nodes}
@@ -608,7 +608,7 @@ class TestGraphTraversal:
     @pytest.mark.asyncio
     async def test_related_with_relation_filter(self, memory_tools, tree):
         """memory_related with relation filter narrows results."""
-        from src.models import MemoryRelatedRequest, MemoryStoreRequest, MemoryLinkRequest
+        from anyide.models import MemoryRelatedRequest, MemoryStoreRequest, MemoryLinkRequest
 
         # Add a non-parent_of edge
         sibling = await memory_tools.store(MemoryStoreRequest(content="sibling"))
@@ -626,7 +626,7 @@ class TestGraphTraversal:
     @pytest.mark.asyncio
     async def test_subtree_returns_all_descendants(self, memory_tools, tree):
         """memory_subtree returns all descendants excluding the root itself."""
-        from src.models import MemorySubtreeRequest
+        from anyide.models import MemorySubtreeRequest
 
         result = await memory_tools.subtree(MemorySubtreeRequest(id=tree["root"].id))
         ids = {n.id for n in result.nodes}
@@ -638,7 +638,7 @@ class TestGraphTraversal:
     @pytest.mark.asyncio
     async def test_subtree_respects_max_depth(self, memory_tools, tree):
         """subtree with max_depth=1 returns only immediate children."""
-        from src.models import MemorySubtreeRequest
+        from anyide.models import MemorySubtreeRequest
 
         result = await memory_tools.subtree(MemorySubtreeRequest(
             id=tree["root"].id, max_depth=1
@@ -651,7 +651,7 @@ class TestGraphTraversal:
     @pytest.mark.asyncio
     async def test_ancestors_depth_limit(self, memory_tools, tree):
         """Ancestors with max_depth=1 returns only immediate parent."""
-        from src.models import MemoryAncestorsRequest
+        from anyide.models import MemoryAncestorsRequest
 
         result = await memory_tools.ancestors(MemoryAncestorsRequest(
             id=tree["gc"].id, max_depth=1
@@ -680,7 +680,7 @@ class TestMemoryStats:
     @pytest.mark.asyncio
     async def test_stats_counts_nodes_and_edges(self, memory_tools):
         """Stats reflect actual node and edge counts."""
-        from src.models import MemoryStoreRequest, MemoryLinkRequest
+        from anyide.models import MemoryStoreRequest, MemoryLinkRequest
 
         a = await memory_tools.store(MemoryStoreRequest(content="A", entity_type="concept"))
         b = await memory_tools.store(MemoryStoreRequest(content="B", entity_type="fact"))
@@ -699,7 +699,7 @@ class TestMemoryStats:
     @pytest.mark.asyncio
     async def test_stats_orphaned_nodes(self, memory_tools):
         """Orphaned node count includes nodes with no edges."""
-        from src.models import MemoryStoreRequest, MemoryLinkRequest
+        from anyide.models import MemoryStoreRequest, MemoryLinkRequest
 
         isolated = await memory_tools.store(MemoryStoreRequest(content="Isolated"))
         connected_a = await memory_tools.store(MemoryStoreRequest(content="A"))
@@ -714,7 +714,7 @@ class TestMemoryStats:
     @pytest.mark.asyncio
     async def test_stats_tags_frequency(self, memory_tools):
         """Tags frequency reflects tag usage across nodes."""
-        from src.models import MemoryStoreRequest
+        from anyide.models import MemoryStoreRequest
 
         await memory_tools.store(MemoryStoreRequest(content="A", tags=["python", "AI"]))
         await memory_tools.store(MemoryStoreRequest(content="B", tags=["python"]))
@@ -728,8 +728,8 @@ class TestMemoryStats:
 # API endpoint integration tests
 # ---------------------------------------------------------------------------
 
-import src.config
-import src.database
+import anyide.config
+import anyide.core.database
 
 _TEST_SECRETS = tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False)
 _TEST_SECRETS.write("TOKEN=secret123\n")
@@ -748,8 +748,8 @@ async def app_client():
     """Async test client wired to the FastAPI app with a temp DB."""
     os.environ["DB_PATH"] = _TEST_DB_PATH
 
-    original_load = src.config.load_config
-    original_db_init = src.database.Database.__init__
+    original_load = anyide.config.load_config
+    original_db_init = anyide.core.database.Database.__init__
 
     def patched_load(config_path="config.yaml"):
         cfg = original_load(config_path)
@@ -760,11 +760,11 @@ async def app_client():
     def patched_db_init(self, db_path=None):
         original_db_init(self, _TEST_DB_PATH)
 
-    src.config.load_config = patched_load
-    src.database.Database.__init__ = patched_db_init
+    anyide.config.load_config = patched_load
+    anyide.core.database.Database.__init__ = patched_db_init
 
     from httpx import AsyncClient, ASGITransport
-    from src.main import app, db
+    from anyide.main import app, db
 
     await db.connect()
 
@@ -779,8 +779,8 @@ async def app_client():
         yield client
 
     await db.close()
-    src.config.load_config = original_load
-    src.database.Database.__init__ = original_db_init
+    anyide.config.load_config = original_load
+    anyide.core.database.Database.__init__ = original_db_init
 
 
 @pytest.mark.asyncio

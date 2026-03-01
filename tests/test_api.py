@@ -20,23 +20,23 @@ async def client():
     os.environ["DB_PATH"] = os.path.join(TEST_DATA_DIR, "hostbridge.db")
     
     # Patch config loading
-    import src.config
-    original_load = src.config.load_config
+    import anyide.config
+    original_load = anyide.config.load_config
     
     def patched_load(config_path="config.yaml"):
         cfg = original_load(config_path)
         cfg.workspace.base_dir = TEST_WORKSPACE
         return cfg
     
-    src.config.load_config = patched_load
+    anyide.config.load_config = patched_load
     
     # Now import the app and initialize database
-    from src.main import app, db
+    from anyide.main import app, db
     
     # Connect to database before tests
     await db.connect()
     
-    from src import main as main_module
+    from anyide import main as main_module
     main_module.config.workspace.base_dir = TEST_WORKSPACE
     main_module.workspace_manager.base_dir = os.path.realpath(TEST_WORKSPACE)
 
@@ -50,7 +50,7 @@ async def client():
     await db.close()
     
     # Restore originals
-    src.config.load_config = original_load
+    anyide.config.load_config = original_load
 
 
 @pytest.fixture
@@ -232,7 +232,7 @@ class TestAuditLogging:
         assert response.status_code == 200
         
         # Check audit log (we'll verify this by checking the database)
-        from src.main import audit_logger
+        from anyide.main import audit_logger
         
         logs = await audit_logger.get_recent_logs(limit=1)
         assert len(logs) > 0
@@ -254,7 +254,7 @@ class TestAuditLogging:
         assert response.status_code == 404
         
         # Check audit log
-        from src.main import audit_logger
+        from anyide.main import audit_logger
         
         # Get more logs to find the error one (in case previous tests added logs)
         logs = await audit_logger.get_recent_logs(limit=10)

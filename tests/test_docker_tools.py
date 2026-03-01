@@ -4,8 +4,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
 
-from src.tools.docker_tools import DockerTools, DOCKER_AVAILABLE
-from src.models import (
+from anyide.modules.docker.tools import DockerTools, DOCKER_AVAILABLE
+from anyide.models import (
     DockerListRequest,
     DockerInspectRequest,
     DockerLogsRequest,
@@ -412,7 +412,7 @@ class TestDockerConnection:
     @pytest.mark.asyncio
     async def test_docker_not_available(self):
         """Test when aiodocker is not installed."""
-        with patch('src.tools.docker_tools.DOCKER_AVAILABLE', False):
+        with patch('anyide.modules.docker.tools.DOCKER_AVAILABLE', False):
             tools = DockerTools()
             with pytest.raises(RuntimeError, match="Docker support not available"):
                 await tools._get_docker()
@@ -421,7 +421,7 @@ class TestDockerConnection:
     @pytest.mark.skipif(not DOCKER_AVAILABLE, reason="aiodocker not installed")
     async def test_docker_connection_error(self, docker_tools):
         """Test Docker connection failure."""
-        with patch('src.tools.docker_tools.aiodocker.Docker') as mock_docker_class:
+        with patch('anyide.modules.docker.tools.aiodocker.Docker') as mock_docker_class:
             mock_instance = MagicMock()
             mock_instance.version = AsyncMock(side_effect=Exception("Connection refused"))
             mock_docker_class.return_value = mock_instance

@@ -3,9 +3,9 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.config import HttpConfig
-from src.models import HttpRequestRequest
-from src.tools.http_tools import (
+from anyide.config import HttpConfig
+from anyide.models import HttpRequestRequest
+from anyide.modules.http.tools import (
     HttpTools,
     SSRFError,
     DomainBlockedError,
@@ -282,7 +282,7 @@ os.environ.setdefault("DB_PATH", _TEST_DB_PATH)
 
 def _get_loaded_modules():
     """Get module instances from the live app bootstrap."""
-    import src.main as main_module
+    import anyide.main as main_module
 
     http_module = main_module.module_registry.modules.get("http")
     workspace_module = main_module.module_registry.modules.get("workspace")
@@ -303,8 +303,8 @@ async def app_client():
     """Create an async test client with the app properly initialized."""
     os.environ["DB_PATH"] = _TEST_DB_PATH
 
-    import src.config
-    original_load = src.config.load_config
+    import anyide.config
+    original_load = anyide.config.load_config
 
     def patched_load(config_path="config.yaml"):
         cfg = original_load(config_path)
@@ -312,18 +312,18 @@ async def app_client():
         cfg.secrets.file = _TEST_SECRETS.name
         return cfg
 
-    src.config.load_config = patched_load
+    anyide.config.load_config = patched_load
 
-    import src.database
-    original_db_init = src.database.Database.__init__
+    import anyide.core.database
+    original_db_init = anyide.core.database.Database.__init__
 
     def patched_db_init(self, db_path=None):
         original_db_init(self, _TEST_DB_PATH)
 
-    src.database.Database.__init__ = patched_db_init
+    anyide.core.database.Database.__init__ = patched_db_init
 
     from httpx import AsyncClient, ASGITransport
-    from src.main import app, db
+    from anyide.main import app, db
 
     await db.connect()
 
@@ -331,14 +331,14 @@ async def app_client():
         yield client
 
     await db.close()
-    src.config.load_config = original_load
-    src.database.Database.__init__ = original_db_init
+    anyide.config.load_config = original_load
+    anyide.core.database.Database.__init__ = original_db_init
 
 
 @pytest.mark.asyncio
 async def test_http_request_endpoint_get(app_client):
     """Test /api/tools/http/request endpoint with a GET request."""
-    from src.models import HttpRequestResponse
+    from anyide.models import HttpRequestResponse
 
     main_module, http_module, _ = _get_loaded_modules()
 
@@ -375,7 +375,7 @@ async def test_workspace_secrets_list_endpoint(app_client):
 
     main_module, _, workspace_module = _get_loaded_modules()
 
-    with patch("src.main.secret_manager") as mock_sm:
+    with patch("anyide.main.secret_manager") as mock_sm:
         mock_sm.list_keys.return_value = ["API_KEY", "DB_PASS"]
         mock_sm.count.return_value = 2
         mock_sm.has_templates.return_value = False
@@ -404,11 +404,11 @@ async def test_workspace_secrets_list_endpoint(app_client):
 @pytest.mark.asyncio
 async def test_secret_template_in_http_headers(app_client):
     """Test that {{secret:KEY}} templates in headers are resolved before request."""
-    from src.models import HttpRequestResponse
+    from anyide.models import HttpRequestResponse
 
     main_module, http_module, _ = _get_loaded_modules()
 
-    with patch("src.main.secret_manager") as mock_sm:
+    with patch("anyide.main.secret_manager") as mock_sm:
         mock_sm.has_templates.return_value = True
         mock_sm.resolve_params.return_value = {
             "url": "https://api.example.com",
@@ -450,9 +450,9 @@ async def test_secret_template_in_http_headers(app_client):
 @pytest.mark.asyncio
 async def test_missing_secret_key_returns_error(app_client):
     """Test that referencing a missing secret key returns a 400 error."""
-    from src.secrets import SecretNotFoundError
+    from anyide.core.secrets import SecretNotFoundError
 
-    with patch("src.main.secret_manager") as mock_sm:
+    with patch("anyide.main.secret_manager") as mock_sm:
         mock_sm.has_templates.return_value = True
         mock_sm.resolve_params.side_effect = SecretNotFoundError(
             "Secret key 'MISSING' not found."
@@ -477,9 +477,9 @@ async def test_missing_secret_key_returns_error(app_client):
 @pytest.mark.asyncio
 async def test_audit_log_shows_templates_not_resolved_values(app_client):
     """Test that audit log records template strings, not resolved secret values."""
-    from src.models import HttpRequestResponse
-    from src.secrets import SecretManager
-    from src.main import audit_logger
+    from anyide.models import HttpRequestResponse
+    from anyide.core.secrets import SecretManager
+    from anyide.main import audit_logger
 
     real_sm = SecretManager(_TEST_SECRETS.name)
 
@@ -488,7 +488,7 @@ async def test_audit_log_shows_templates_not_resolved_values(app_client):
 
     main_module, http_module, _ = _get_loaded_modules()
 
-    with patch("src.main.secret_manager", real_sm):
+    with patch("anyide.main.secret_manager", real_sm):
         with patch.object(http_module, "http_tools") as mock_tools:
             original_global = main_module.http_tools
             main_module.http_tools = mock_tools
