@@ -1,6 +1,6 @@
-# HostBridge Admin Dashboard
+# AnyIDE Admin Dashboard
 
-A premium, modern admin dashboard for HostBridge with beautiful 3D animations and real-time updates.
+A premium, modern admin dashboard for AnyIDE with beautiful 3D animations and real-time updates.
 
 ## 🚀 Quick Start
 
@@ -144,7 +144,7 @@ environment:
 
 Then restart:
 ```bash
-docker compose restart hostbridge
+docker compose restart anyide
 ```
 
 ### Change Port
@@ -249,7 +249,7 @@ Session-based authentication with httponly cookies:
 
 1. Check browser console (F12) for JavaScript errors
 2. Verify assets are loading (Network tab)
-3. Check container logs: `docker compose logs hostbridge`
+3. Check container logs: `docker compose logs anyide`
 4. Try hard refresh: Ctrl+Shift+R (or Cmd+Shift+R on Mac)
 
 ### Login Fails
@@ -279,7 +279,7 @@ Session-based authentication with httponly cookies:
 2. Trigger a test request (see Testing section above)
 3. Check container logs for HITL creation:
    ```bash
-   docker compose logs hostbridge | grep hitl
+   docker compose logs anyide | grep hitl
    ```
 
 ### Page Refresh Shows 404
@@ -358,7 +358,7 @@ This dashboard takes inspiration from premium design systems:
 ## Need Help?
 
 1. Check browser console (F12) for errors
-2. Check container logs: `docker compose logs hostbridge -f`
+2. Check container logs: `docker compose logs anyide -f`
 3. Verify health endpoint: `curl http://localhost:8080/health`
 4. Review documentation in `development/` folder
 5. Check WebSocket connection in Network tab (filter by WS)
@@ -371,4 +371,4 @@ This dashboard takes inspiration from premium design systems:
 
 ## License
 
-Part of the HostBridge project.
+Part of the AnyIDE project.

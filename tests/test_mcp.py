@@ -101,7 +101,7 @@ class TestMCPStreamableHTTP:
         # Check server info
         server_info = result["result"]["serverInfo"]
         assert "name" in server_info
-        assert server_info["name"] == "HostBridge"
+        assert server_info["name"] == "AnyIDE"
         
         # Check for session ID in headers
         session_id = response.headers.get("Mcp-Session-Id")

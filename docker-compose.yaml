@@ -1,29 +1,29 @@
 services:
-  hostbridge:
+  anyide:
     build: .
-    container_name: hostbridge
+    container_name: anyide
     restart: unless-stopped
     ports:
-      - "${HOSTBRIDGE_PORT:-8080}:8080"
+      - "${ANYIDE_PORT:-${HOSTBRIDGE_PORT:-8080}}:8080"
     environment:
-      - WORKSPACE_BASE_DIR=${WORKSPACE_BASE_DIR:-/workspace}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - WORKSPACE_BASE_DIR=${ANYIDE_WORKSPACE_BASE_DIR:-${WORKSPACE_BASE_DIR:-/workspace}}
+      - ADMIN_PASSWORD=${ANYIDE_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-admin}}
       - SECRETS_FILE=/secrets/secrets.env
-      - AUDIT_RETENTION_DAYS=${AUDIT_RETENTION_DAYS:-30}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - HITL_TTL_SECONDS=${HITL_TTL_SECONDS:-300}
+      - AUDIT_RETENTION_DAYS=${ANYIDE_AUDIT_RETENTION_DAYS:-${AUDIT_RETENTION_DAYS:-30}}
+      - LOG_LEVEL=${ANYIDE_LOG_LEVEL:-${LOG_LEVEL:-INFO}}
+      - HITL_TTL_SECONDS=${ANYIDE_HITL_TTL_SECONDS:-${HITL_TTL_SECONDS:-300}}
     volumes:
       # Workspace mount — user configures this
-      - ${HOST_WORKSPACE_DIR}:/workspace
-      
+      - ${ANYIDE_HOST_WORKSPACE_DIR:-${HOST_WORKSPACE_DIR}}:/workspace
+
       # Docker socket for container management (optional, for Docker tools)
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      
+
       # Secrets file (optional)
-      - ${SECRETS_FILE_PATH:-./secrets.env}:/secrets/secrets.env:ro
-      
+      - ${ANYIDE_SECRETS_FILE_PATH:-${SECRETS_FILE_PATH:-./secrets.env}}:/secrets/secrets.env:ro
+
       # Persistent data (audit logs, memory DB, etc.)
       - ./data:/data
-      
+
       # Configuration file
-      - ${CONFIG_FILE:-./config.yaml}:/app/config.yaml:ro
+      - ${ANYIDE_CONFIG_FILE:-${CONFIG_FILE:-./config.yaml}}:/app/config.yaml:ro

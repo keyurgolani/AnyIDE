@@ -190,7 +190,7 @@ class TestOpenAPISpec:
         assert response.status_code == 200
         spec = response.json()
         
-        assert spec["info"]["title"] == "HostBridge"
+        assert spec["info"]["title"] == "AnyIDE"
         assert "paths" in spec
         
         # Check that tools are present

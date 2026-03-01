@@ -34,7 +34,7 @@ export default function DashboardLayout() {
   // Send browser notification for new HITL requests
   const sendHITLNotification = useCallback((count: number) => {
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('HostBridge - HITL Request', {
+      new Notification('AnyIDE - HITL Request', {
         body: `You have ${count} pending approval request${count > 1 ? 's' : ''}`,
         icon: '/admin/favicon.ico',
         tag: 'hitl-request',
@@ -131,7 +131,7 @@ export default function DashboardLayout() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}
               >
-                HostBridge Admin
+                AnyIDE Admin
               </motion.h1>
               <span className="text-xs text-muted-foreground hidden md:block">
                 {currentPage}

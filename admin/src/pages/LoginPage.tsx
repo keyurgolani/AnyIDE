@@ -54,7 +54,7 @@ export default function LoginPage() {
             >
               <Lock className="w-8 h-8 text-primary" />
             </motion.div>
-            <CardTitle>Welcome to HostBridge</CardTitle>
+            <CardTitle>Welcome to AnyIDE</CardTitle>
             <CardDescription>Enter your admin password to continue</CardDescription>
           </CardHeader>
           
@@ -105,7 +105,7 @@ export default function LoginPage() {
           transition={{ delay: 0.5 }}
           className="text-center text-sm text-muted-foreground mt-4"
         >
-          HostBridge v0.1.0 — Secure Tool Server
+          AnyIDE v0.1.0 — Secure Tool Server
         </motion.p>
       </motion.div>
     </div>

@@ -1,4 +1,4 @@
-# HostBridge Tool Catalog
+# AnyIDE Tool Catalog
 
 Auto-generated documentation for all available tools.
 
@@ -1134,7 +1134,7 @@ Useful for aborting long-running plans.
 
 Create a new multi-step plan with a DAG of tasks.
 
-Each task specifies a HostBridge tool to call (tool_category + tool_name + params).
+Each task specifies an AnyIDE tool to call (tool_category + tool_name + params).
 Tasks may depend on other tasks via `depends_on` (list of task IDs).
 Task params may contain `{{task:TASK_ID.field}}` references resolved at runtime.
 

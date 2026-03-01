@@ -297,7 +297,7 @@ open http://localhost:8080/admin/
 ### Test Case: MCP-001 - Tool Discovery
 
 **Steps:**
-1. Configure Claude Desktop to use HostBridge MCP endpoint
+1. Configure Claude Desktop to use AnyIDE MCP endpoint
 2. Start a conversation
 3. Ask: "What tools do you have available?"
 4. Verify all 8 tool categories are listed
@@ -312,7 +312,7 @@ open http://localhost:8080/admin/
 ### Test Case: MCP-002 - Tool Execution
 
 **Steps:**
-1. In Claude Desktop with HostBridge configured:
+1. In Claude Desktop with AnyIDE configured:
 2. Ask: "Read the README.md file from the workspace"
 3. Verify Claude can execute fs_read tool
 4. Verify file contents are returned

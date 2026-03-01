@@ -1,4 +1,4 @@
-"""Configuration management for HostBridge."""
+"""Configuration management for AnyIDE."""
 
 import os
 from pathlib import Path

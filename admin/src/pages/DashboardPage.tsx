@@ -34,7 +34,7 @@ export default function DashboardPage() {
       >
         <h1 className="text-3xl md:text-4xl font-bold gradient-text mb-2">Dashboard</h1>
         <p className="text-sm md:text-base text-muted-foreground">
-          Monitor and manage your HostBridge system
+          Monitor and manage your AnyIDE system
         </p>
       </motion.div>
 

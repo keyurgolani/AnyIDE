@@ -1,6 +1,6 @@
-# HostBridge
+# AnyIDE
 
-**Unified MCP + OpenAPI Tool Server for Self-Hosted LLM Stacks**
+**Self-hosted tool server exposing host-machine capabilities to LLM clients via MCP and OpenAPI protocols**
 
 Version: 0.1.0  
 Status: ✅ Production Ready
@@ -9,7 +9,7 @@ Status: ✅ Production Ready
 
 ## Overview
 
-HostBridge is a single Docker container that exposes host-machine management capabilities to LLM applications via two industry-standard protocols simultaneously:
+AnyIDE is a single Docker container that exposes host-machine management capabilities to LLM applications via two industry-standard protocols simultaneously:
 
 - **MCP (Model Context Protocol)** over Streamable HTTP
 - **OpenAPI (REST/JSON)** for tools like Open WebUI
@@ -149,12 +149,12 @@ curl -X POST http://localhost:8080/api/tools/docker/list \
 # Inspect a Docker container
 curl -X POST http://localhost:8080/api/tools/docker/inspect \
   -H "Content-Type: application/json" \
-  -d '{"container": "hostbridge"}'
+  -d '{"container": "anyide"}'
 
 # Get Docker container logs
 curl -X POST http://localhost:8080/api/tools/docker/logs \
   -H "Content-Type: application/json" \
-  -d '{"container": "hostbridge", "tail": 50}'
+  -d '{"container": "anyide", "tail": 50}'
 
 # Write a file (triggers HITL for .conf files)
 curl -X POST http://localhost:8080/api/tools/fs/write \
@@ -219,7 +219,7 @@ ADMIN_PASSWORD=your-secure-password
 
 # Optional
 WORKSPACE_BASE_DIR=/workspace
-HOSTBRIDGE_PORT=8080
+ANYIDE_PORT=8080
 AUDIT_RETENTION_DAYS=30
 LOG_LEVEL=INFO
 HITL_TTL_SECONDS=300
@@ -270,7 +270,7 @@ http:
 
 ```yaml
 services:
-  hostbridge:
+  anyide:
     build: .
     ports:
       - "8080:8080"
@@ -579,7 +579,7 @@ npm run dev
 - **Admin Dashboard Guide:** `admin/README.md` - Complete dashboard documentation
 - **Commands to Try:** `CommandsToTry.md` - Sample commands for LLM interaction
 - **Tool Catalog:** `docs/TOOL_CATALOG.md` - Auto-generated endpoint and MCP tool reference
-- **LLM Prompt Template:** `docs/LLM_SYSTEM_PROMPT.md` - Starter system prompt for HostBridge-connected assistants
+- **LLM Prompt Template:** `docs/LLM_SYSTEM_PROMPT.md` - Starter system prompt for AnyIDE-connected assistants
 - **Docker Publishing Guide:** `docs/DOCKER_HUB_PUBLISHING.md` - Build/tag/publish workflow
 - **Deployment Examples:** `examples/` - `config.basic.yaml`, `config.development.yaml`, `config.restricted.yaml`, and production compose template
 - **API Documentation:** http://localhost:8080/docs - Interactive OpenAPI docs
@@ -637,7 +637,7 @@ Contributions are welcome. Prefer focused pull requests, include tests for behav
 
 1. **Check container logs:**
    ```bash
-   docker compose logs hostbridge -f
+   docker compose logs anyide -f
    ```
 
 2. **Verify health:**

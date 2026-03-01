@@ -1,6 +1,6 @@
 # Docker Hub Publishing Guide
 
-This guide explains how to build and publish the HostBridge Docker image to Docker Hub.
+This guide explains how to build and publish the AnyIDE Docker image to Docker Hub.
 
 ## Prerequisites
 
@@ -14,10 +14,10 @@ This guide explains how to build and publish the HostBridge Docker image to Dock
 
 ```bash
 # Build with default tag
-docker build -t hostbridge:latest .
+docker build -t anyide:latest .
 
 # Build with specific version tag
-docker build -t hostbridge:0.1.0 .
+docker build -t anyide:0.1.0 .
 ```
 
 ### Multi-platform Build (Recommended)
@@ -29,7 +29,7 @@ For compatibility with different architectures:
 docker buildx create --use
 
 # Build for multiple platforms
-docker buildx build --platform linux/amd64,linux/arm64 -t hostbridge:latest .
+docker buildx build --platform linux/amd64,linux/arm64 -t anyide:latest .
 ```
 
 ## Tagging Convention
@@ -38,13 +38,13 @@ Use semantic versioning:
 
 ```bash
 # Latest stable release
-docker tag hostbridge:latest yourusername/hostbridge:latest
+docker tag anyide:latest yourusername/anyide:latest
 
 # Specific version
-docker tag hostbridge:latest yourusername/hostbridge:0.1.0
+docker tag anyide:latest yourusername/anyide:0.1.0
 
 # Version series
-docker tag hostbridge:latest yourusername/hostbridge:0.1
+docker tag anyide:latest yourusername/anyide:0.1
 ```
 
 ## Publishing to Docker Hub
@@ -59,23 +59,23 @@ docker login
 
 ```bash
 # Replace 'yourusername' with your Docker Hub username
-docker tag hostbridge:latest yourusername/hostbridge:latest
-docker tag hostbridge:latest yourusername/hostbridge:0.1.0
+docker tag anyide:latest yourusername/anyide:latest
+docker tag anyide:latest yourusername/anyide:0.1.0
 ```
 
 ### Step 3: Push
 
 ```bash
-docker push yourusername/hostbridge:latest
-docker push yourusername/hostbridge:0.1.0
+docker push yourusername/anyide:latest
+docker push yourusername/anyide:0.1.0
 ```
 
 ### One-liner
 
 ```bash
-docker build -t yourusername/hostbridge:latest -t yourusername/hostbridge:0.1.0 . && \
-docker push yourusername/hostbridge:latest && \
-docker push yourusername/hostbridge:0.1.0
+docker build -t yourusername/anyide:latest -t yourusername/anyide:0.1.0 . && \
+docker push yourusername/anyide:latest && \
+docker push yourusername/anyide:0.1.0
 ```
 
 ## GitHub Actions Automation
@@ -117,8 +117,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/hostbridge:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/hostbridge:${{ steps.version.outputs.VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/anyide:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/anyide:${{ steps.version.outputs.VERSION }}
 ```
 
 ## Docker Hub Repository Setup
@@ -126,13 +126,13 @@ jobs:
 1. Create repository on Docker Hub:
    - Go to https://hub.docker.com/
    - Click "Create Repository"
-   - Name: `hostbridge`
+   - Name: `anyide`
    - Description: "Unified MCP + OpenAPI Tool Server for Self-Hosted LLM Stacks"
    - Set visibility (public recommended)
 
 2. Add repository description:
    ```markdown
-   # HostBridge
+   # AnyIDE
 
    Unified MCP + OpenAPI Tool Server for Self-Hosted LLM Stacks
 
@@ -144,7 +144,7 @@ jobs:
      -v ./workspace:/workspace \
      -v ./data:/data \
      -e ADMIN_PASSWORD=your_password \
-     yourusername/hostbridge:latest
+     yourusername/anyide:latest
    ```
 
    ## Features
@@ -158,8 +158,8 @@ jobs:
 
    ## Documentation
 
-   - [GitHub Repository](https://github.com/yourusername/hostbridge)
-   - [Documentation](https://github.com/yourusername/hostbridge#readme)
+   - [GitHub Repository](https://github.com/yourusername/anyide)
+   - [Documentation](https://github.com/yourusername/anyide#readme)
    ```
 
 3. Configure webhooks (optional):
@@ -188,9 +188,9 @@ git push origin v0.1.0
 
 ```bash
 # Re-tag a previous version as latest
-docker pull yourusername/hostbridge:0.0.9
-docker tag yourusername/hostbridge:0.0.9 yourusername/hostbridge:latest
-docker push yourusername/hostbridge:latest
+docker pull yourusername/anyide:0.0.9
+docker tag yourusername/anyide:0.0.9 yourusername/anyide:latest
+docker push yourusername/anyide:latest
 ```
 
 ## Security Best Practices
@@ -199,7 +199,7 @@ docker push yourusername/hostbridge:latest
 2. Use GitHub secrets for Docker Hub credentials
 3. Scan images for vulnerabilities:
    ```bash
-   docker scout cves yourusername/hostbridge:latest
+   docker scout cves yourusername/anyide:latest
    ```
 4. Sign images with Docker Content Trust
 5. Use minimal base images for smaller attack surface
@@ -210,10 +210,10 @@ After publishing, verify the image:
 
 ```bash
 # Pull fresh image
-docker pull yourusername/hostbridge:latest
+docker pull yourusername/anyide:latest
 
 # Run and test
-docker run -d -p 8080:8080 -e ADMIN_PASSWORD=test yourusername/hostbridge:latest
+docker run -d -p 8080:8080 -e ADMIN_PASSWORD=test yourusername/anyide:latest
 
 # Check health
 curl http://localhost:8080/health

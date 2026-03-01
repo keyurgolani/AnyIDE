@@ -202,46 +202,46 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI apps
 app = FastAPI(
-    title="HostBridge",
-    description="Unified MCP + OpenAPI Tool Server for Self-Hosted LLM Stacks",
+    title="AnyIDE",
+    description="Self-hosted tool server exposing host-machine capabilities to LLM clients via MCP and OpenAPI protocols",
     version="0.1.0",
     lifespan=lifespan,
 )
 
 # Per-category sub-apps
 fs_app = FastAPI(
-    title="HostBridge — Filesystem Tools",
-    description="Filesystem operations for HostBridge",
+    title="AnyIDE — Filesystem Tools",
+    description="Filesystem operations for AnyIDE",
     version="0.1.0",
 )
 
 workspace_app = FastAPI(
-    title="HostBridge — Workspace Tools",
-    description="Workspace management for HostBridge",
+    title="AnyIDE — Workspace Tools",
+    description="Workspace management for AnyIDE",
     version="0.1.0",
 )
 
 git_app = FastAPI(
-    title="HostBridge — Git Tools",
-    description="Git repository management for HostBridge",
+    title="AnyIDE — Git Tools",
+    description="Git repository management for AnyIDE",
     version="0.1.0",
 )
 
 docker_app = FastAPI(
-    title="HostBridge — Docker Tools",
-    description="Docker container management for HostBridge",
+    title="AnyIDE — Docker Tools",
+    description="Docker container management for AnyIDE",
     version="0.1.0",
 )
 
 memory_app = FastAPI(
-    title="HostBridge — Memory Tools",
-    description="Graph-based knowledge storage for HostBridge",
+    title="AnyIDE — Memory Tools",
+    description="Graph-based knowledge storage for AnyIDE",
     version="0.1.0",
 )
 
 plan_app = FastAPI(
-    title="HostBridge — Plan Tools",
-    description="DAG-based multi-step plan execution for HostBridge",
+    title="AnyIDE — Plan Tools",
+    description="DAG-based multi-step plan execution for AnyIDE",
     version="0.1.0",
 )
 
@@ -752,8 +752,8 @@ async def _workspace_secrets_list() -> WorkspaceSecretsListResponse:
 
 # Create http sub-app
 http_app = FastAPI(
-    title="HostBridge — HTTP Tools",
-    description="HTTP client with SSRF protection for HostBridge",
+    title="AnyIDE — HTTP Tools",
+    description="HTTP client with SSRF protection for AnyIDE",
     version="0.1.0",
 )
 
@@ -1336,8 +1336,8 @@ async def shell_execute_root(request: ShellExecuteRequest) -> ShellExecuteRespon
 
 # Create shell sub-app
 shell_app = FastAPI(
-    title="HostBridge — Shell Tools",
-    description="Shell command execution for HostBridge",
+    title="AnyIDE — Shell Tools",
+    description="Shell command execution for AnyIDE",
     version="0.1.0",
 )
 
@@ -1409,8 +1409,8 @@ async def shell_execute_sub(request: ShellExecuteRequest) -> ShellExecuteRespons
 
 # Create git sub-app
 git_app = FastAPI(
-    title="HostBridge — Git Tools",
-    description="Git repository management for HostBridge",
+    title="AnyIDE — Git Tools",
+    description="Git repository management for AnyIDE",
     version="0.1.0",
 )
 

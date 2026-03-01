@@ -2,16 +2,16 @@
 # A complete setup for production deployment
 
 services:
-  hostbridge:
-    image: yourusername/hostbridge:latest
-    container_name: hostbridge
+  anyide:
+    image: yourusername/anyide:latest
+    container_name: anyide
     restart: unless-stopped
 
     ports:
       - "8080:8080"
 
     environment:
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+      - ADMIN_PASSWORD=${ANYIDE_ADMIN_PASSWORD:-${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}}
       - WORKSPACE_BASE_DIR=/workspace
       - LOG_LEVEL=INFO
       - AUDIT_RETENTION_DAYS=90
@@ -63,7 +63,7 @@ services:
 # Optional: Add a reverse proxy
 #  nginx:
 #    image: nginx:alpine
-#    container_name: hostbridge-proxy
+#    container_name: anyide-proxy
 #    restart: unless-stopped
 #    ports:
 #      - "80:80"
@@ -72,4 +72,4 @@ services:
 #      - ./nginx.conf:/etc/nginx/nginx.conf:ro
 #      - ./certs:/etc/nginx/certs:ro
 #    depends_on:
-#      - hostbridge
+#      - anyide
