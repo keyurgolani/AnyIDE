@@ -121,6 +121,7 @@ class CallSite:
 
     name: str
     line: int
+    col: int
 
 
 class TreeSitterService:
@@ -229,6 +230,7 @@ class TreeSitterService:
         def visit(node: Node) -> None:
             if node.type in CALL_NODE_TYPES:
                 line_no = node.start_point.row + 1
+                col_no = node.start_point.column + 1
                 if start_line is not None and line_no < start_line:
                     pass
                 elif end_line is not None and line_no > end_line:
@@ -236,7 +238,7 @@ class TreeSitterService:
                 else:
                     name = self._extract_call_name(node)
                     if name:
-                        calls.append(CallSite(name=name, line=line_no))
+                        calls.append(CallSite(name=name, line=line_no, col=col_no))
             for child in node.children:
                 visit(child)
 

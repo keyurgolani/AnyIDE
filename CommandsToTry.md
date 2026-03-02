@@ -358,7 +358,7 @@ For skills module operation modes:
 **"Checkout the feature branch"** (requires approval)
 - Switches to a different branch
 
-## Language Tools (Tree-sitter First)
+## Language Tools (Tree-sitter + LSP)
 
 ### Structure-Aware Reading
 
@@ -367,6 +367,7 @@ For skills module operation modes:
 
 **"Read only function process_data from src/app.py with line numbers"**
 - Calls `lang_read_file` with `window: "function:process_data"` and `format: "numbered"`
+- Includes `lsp_enrichments` (hover and go-to-definition metadata) when an LSP server is configured for that language
 
 **"Show only imports from src/app.py"**
 - Calls `lang_read_file` with `window: "import:*"`
@@ -394,12 +395,17 @@ For skills module operation modes:
 - Calls `lang_search_symbols` with wildcard query and language filter
 
 **"Build a reference graph for src/app.py"**
-- Calls `lang_reference_graph` for file-scope caller/callee edges
+- Calls `lang_reference_graph` for file/workspace caller/callee edges
+- Adds semantic cross-file edges for JS/TS when LSP is available
 
 ### Validation
 
 **"Validate syntax and lint for src/app.py"**
 - Calls `lang_validate` with checks `["syntax","lint"]`
+
+**"Run type checks for src/app.ts"**
+- Calls `lang_validate` with checks `["syntax","type"]`
+- Uses configured LSP server diagnostics (for example `typescript-language-server`)
 
 **"Check if src/broken.py has syntax errors"**
 - Calls `lang_validate` with checks `["syntax"]`
@@ -430,6 +436,16 @@ curl -X POST http://localhost:8080/api/tools/language/search_symbols \
 curl -X POST http://localhost:8080/api/tools/language/validate \
   -H "Content-Type: application/json" \
   -d '{"path":"src/app.py","checks":["syntax","lint"]}'
+
+# Syntax + type diagnostics (LSP-backed)
+curl -X POST http://localhost:8080/api/tools/language/validate \
+  -H "Content-Type: application/json" \
+  -d '{"path":"src/app.ts","checks":["syntax","type"]}'
+
+# Workspace reference graph with LSP semantic edges (when available)
+curl -X POST http://localhost:8080/api/tools/language/reference_graph \
+  -H "Content-Type: application/json" \
+  -d '{"path":"src/app.ts","scope":"workspace"}'
 ```
 
 ## Skills Module
@@ -908,8 +924,8 @@ As of this version, AnyIDE supports:
   - `lang_create_file` - Create files with syntax/lint validation and symbol extraction
   - `lang_index` - Build/update workspace symbol index
   - `lang_search_symbols` - Query indexed symbols by wildcard/name/kind/language
-  - `lang_reference_graph` - Build baseline reference graph for file/workspace scope
-  - `lang_validate` - Run syntax and linter checks
+  - `lang_reference_graph` - Build reference graph and add LSP semantic cross-file edges (JS/TS)
+  - `lang_validate` - Run syntax/lint checks plus optional LSP type checks
 
 - **Skills Tools** (category: `skills`)
   - `skills_list` - List locally installed skills from isolated `/skills` storage (including `.agents/skills` installs)
@@ -978,8 +994,8 @@ When using MCP clients (Claude Desktop, Cursor, etc.), tools are identified by t
 - `lang_create_file` - Create code files with validation
 - `lang_index` - Build/update symbol index
 - `lang_search_symbols` - Search indexed symbols
-- `lang_reference_graph` - Build baseline reference graph
-- `lang_validate` - Run syntax/lint validation
+- `lang_reference_graph` - Build reference graph with LSP semantic enrichment
+- `lang_validate` - Run syntax/lint/type validation
 - `skills_list` - List installed skills
 - `skills_read` - Read SKILL.md content
 - `skills_read_file` - Read files inside skill directories
@@ -1043,7 +1059,7 @@ When using REST API directly:
 - `POST /api/tools/language/index` - Index workspace symbols
 - `POST /api/tools/language/search_symbols` - Search indexed symbols
 - `POST /api/tools/language/reference_graph` - Build reference graph
-- `POST /api/tools/language/validate` - Validate syntax/lint
+- `POST /api/tools/language/validate` - Validate syntax/lint/type (LSP-backed type diagnostics when configured)
 - `POST /api/tools/skills/list` - List locally installed skills
 - `POST /api/tools/skills/read` - Read SKILL.md content
 - `POST /api/tools/skills/read_file` - Read a specific skill file

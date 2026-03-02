@@ -18,6 +18,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Language servers for LSP-enhanced language tools
+RUN npm install -g pyright typescript typescript-language-server
+
 # Application code
 COPY anyide/ ./anyide/
 

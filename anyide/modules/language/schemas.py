@@ -45,6 +45,24 @@ class LangReadFileResponse(BaseModel):
     content: str
     window_applied: Optional[str] = None
     symbols_in_view: list[LangSymbolRef] = Field(default_factory=list)
+    lsp_enrichments: list["LangReadLspEnrichment"] = Field(default_factory=list)
+
+
+class LangReadLspDefinition(BaseModel):
+    """LSP go-to-definition location for a symbol in the read view."""
+
+    file: str
+    line: int
+    col: int
+
+
+class LangReadLspEnrichment(BaseModel):
+    """LSP hover/definition enrichment for symbols in the selected view."""
+
+    symbol: str
+    line: int
+    hover: Optional[str] = None
+    definitions: list[LangReadLspDefinition] = Field(default_factory=list)
 
 
 class LangSkeletonRequest(BaseModel):

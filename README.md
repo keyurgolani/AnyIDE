@@ -42,10 +42,14 @@ Built-in admin dashboard provides human oversight, HITL (Human-in-the-Loop) appr
   - Control container lifecycle (start, stop, restart, pause, unpause)
   - HITL approval for destructive operations
   - Docker socket integration with security controls
-- **Language Tools (Tree-sitter First):** IDE-grade structural code tooling
+- **Language Tools (Tree-sitter + LSP):** IDE-grade structural code tooling
   - `lang_skeleton` and `lang_read_file` for structure-aware code navigation
   - `lang_diff` and `lang_apply_patch` for function-anchored edit workflows with backup + validation
   - `lang_create_file`, `lang_validate`, `lang_index`, `lang_search_symbols`, `lang_reference_graph`
+  - `lang_validate` supports syntax/lint/type checks (`pyright` + `typescript-language-server` when configured)
+  - `lang_reference_graph` adds semantic cross-file edges for JavaScript/TypeScript via LSP
+  - `lang_read_file` includes optional LSP hover/go-to-definition enrichments
+  - LSP process lifecycle includes lazy startup, initialize handshake, timeout recovery, and restart on crash
   - Incremental SQLite-backed symbol index and baseline linter routing (ruff for Python)
 - **Skills Module:** Isolated `/skills` storage and skills.sh integration
   - Offline-capable local tools: `skills_list`, `skills_read`, `skills_read_file`
@@ -196,10 +200,15 @@ curl -X POST http://localhost:8080/api/tools/language/read_file \
   -H "Content-Type: application/json" \
   -d '{"path":"main.py","window":"function:run","format":"numbered"}'
 
-# Validate syntax + lint for a Python file
+# Validate syntax + lint + type for a Python file
 curl -X POST http://localhost:8080/api/tools/language/validate \
   -H "Content-Type: application/json" \
-  -d '{"path":"main.py","checks":["syntax","lint"]}'
+  -d '{"path":"main.py","checks":["syntax","lint","type"]}'
+
+# Validate TypeScript types via LSP
+curl -X POST http://localhost:8080/api/tools/language/validate \
+  -H "Content-Type: application/json" \
+  -d '{"path":"app.ts","checks":["syntax","type"]}'
 
 # List installed local skills (offline-capable)
 curl -X POST http://localhost:8080/api/tools/skills/list
@@ -320,6 +329,21 @@ skills:
 - Online mode: `skills_search` and `skills_install` require outbound network access.
 - `skills_install` runs in project scope (no `--global`) so installed skills remain under mounted `/skills` storage.
 - `skills_install` is HITL-gated by default because it downloads and executes external code.
+
+### Language + LSP (`config.yaml`)
+
+```yaml
+language:
+  linters:
+    python: "ruff"
+  lsp_servers:
+    python: "pyright"
+    typescript: "typescript-language-server"
+```
+
+- LSP servers start lazily and stay resident for reuse.
+- If a server binary is missing or initialization fails, language tools fall back to tree-sitter behavior.
+- Type diagnostics are returned in `lang_validate.type_check.errors` when `checks` includes `"type"`.
 
 ### LLM Endpoints (`config.yaml`)
 
@@ -611,8 +635,8 @@ http://localhost:8080/admin/
 - `lang_create_file` - Create a new code file with syntax/lint validation and symbol extraction
 - `lang_index` - Incrementally index workspace symbols into persistent SQLite tables
 - `lang_search_symbols` - Query indexed symbols by wildcard/name/kind/language
-- `lang_reference_graph` - Build baseline file/workspace function reference graph
-- `lang_validate` - Run syntax and language-routed lint checks
+- `lang_reference_graph` - Build file/workspace reference graph with LSP semantic cross-file edges for JS/TS
+- `lang_validate` - Run syntax/lint checks plus optional LSP type diagnostics (`checks: ["type"]`)
 
 ### Skills
 
@@ -809,7 +833,7 @@ npm run dev
 - DAG plan orchestration with ready-task snapshots, task references, and configurable failure policies.
 
 ### Test Coverage Snapshot
-- `pytest --collect-only -q` reports 496 backend tests.
+- `pytest --collect-only -q` reports 505 backend tests.
 - Memory tool suite: 48 tests.
 - Plan orchestration suite: 22 tests.
 - HITL WebSocket roundtrip tests: 7 tests.

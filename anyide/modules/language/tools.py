@@ -31,6 +31,8 @@ from anyide.modules.language.schemas import (
     LangPatchFailedHunk,
     LangPatchValidation,
     LangReadFileRequest,
+    LangReadLspDefinition,
+    LangReadLspEnrichment,
     LangReadFileResponse,
     LangReferenceCallSite,
     LangReferenceEdge,
@@ -52,6 +54,7 @@ from anyide.modules.language.schemas import (
     LangValidateSyntax,
     LangValidateTypeCheck,
 )
+from anyide.modules.language.lsp_client import LSPManager
 from anyide.modules.language.treesitter import (
     EXTENSION_TO_LANGUAGE,
     ExtractedSymbol,
@@ -87,11 +90,16 @@ class LanguageTools:
         db: Database,
         config: Config,
         tree_sitter: Optional[TreeSitterService] = None,
+        lsp_manager: Optional[LSPManager] = None,
     ):
         self.workspace = workspace
         self.db = db
         self.config = config
         self.tree_sitter = tree_sitter or TreeSitterService()
+        self.lsp_manager = lsp_manager or LSPManager(
+            workspace_root=self.workspace.base_dir,
+            lsp_servers=self._language_lsp_config(),
+        )
 
     def on_startup(self) -> None:
         """Warm parser cache for common languages."""
@@ -99,7 +107,7 @@ class LanguageTools:
 
     async def on_shutdown(self) -> None:
         """Lifecycle hook for symmetry with module contract."""
-        return None
+        await self.lsp_manager.shutdown()
 
     async def skeleton(self, request: LangSkeletonRequest) -> LangSkeletonResponse:
         """Return structural skeleton for one or more files."""
@@ -130,6 +138,7 @@ class LanguageTools:
 
     async def read_file(self, request: LangReadFileRequest) -> LangReadFileResponse:
         """Read a source file with structure-aware windows and output formats."""
+        workspace_root = self._resolve_workspace_root(request.workspace_dir)
         resolved_path = self._resolve_file(request.path, request.workspace_dir)
         language = self._detect_language(resolved_path)
         content = self._read_file(resolved_path)
@@ -156,6 +165,15 @@ class LanguageTools:
         else:
             selected_content = selected_text
 
+        flat_symbols = self.tree_sitter.flatten_symbols(selected_symbols)
+        lsp_enrichments = await self._build_read_file_lsp_enrichments(
+            language=language,
+            file_path=resolved_path,
+            workspace_root=workspace_root,
+            content=content,
+            symbols=flat_symbols,
+        )
+
         return LangReadFileResponse(
             path=resolved_path,
             language=language,
@@ -164,8 +182,9 @@ class LanguageTools:
             window_applied=applied_window,
             symbols_in_view=[
                 self._to_symbol_ref(symbol)
-                for symbol in self.tree_sitter.flatten_symbols(selected_symbols)
+                for symbol in flat_symbols
             ],
+            lsp_enrichments=lsp_enrichments,
         )
 
     async def diff(self, request: LangDiffRequest) -> LangDiffResponse:
@@ -232,7 +251,7 @@ class LanguageTools:
                 LangValidateRequest(
                     path=request.path,
                     workspace_dir=request.workspace_dir,
-                    checks=["syntax", "lint"],
+                    checks=["syntax", "lint", "type"],
                 )
             )
             validation = LangPatchValidation(
@@ -478,7 +497,7 @@ class LanguageTools:
     async def reference_graph(
         self, request: LangReferenceGraphRequest
     ) -> LangReferenceGraphResponse:
-        """Build a baseline call reference graph."""
+        """Build a call reference graph with tree-sitter baseline and LSP enrichment."""
         workspace_root = self._resolve_workspace_root(request.workspace_dir)
 
         if request.scope == "file":
@@ -494,11 +513,15 @@ class LanguageTools:
 
         nodes: dict[str, LangReferenceNode] = {}
         name_to_node_ids: dict[str, list[str]] = {}
-        call_records: list[tuple[str, str, list[tuple[str, int]]]] = []
+        call_records: list[tuple[str, str, list[tuple[str, int, int]]]] = []
+        symbol_positions: dict[str, tuple[str, int, int, str, str]] = {}
+        node_spans_by_file: dict[str, list[tuple[int, int, str]]] = {}
+        file_context: dict[str, tuple[str, str, str]] = {}
 
         for absolute_path, relative_path in files:
             content = self._read_file(absolute_path)
             language = self._detect_language(absolute_path)
+            file_context[relative_path] = (absolute_path, content, language)
             symbols = self.tree_sitter.extract_symbols(content, language, depth="full")
 
             for symbol, parent_name in self._flatten_with_parent(symbols):
@@ -520,6 +543,16 @@ class LanguageTools:
                 )
                 nodes[node_id] = node
                 name_to_node_ids.setdefault(symbol.name, []).append(node_id)
+                node_spans_by_file.setdefault(relative_path, []).append(
+                    (symbol.start_line, symbol.end_line, node_id)
+                )
+                symbol_positions[node_id] = (
+                    absolute_path,
+                    symbol.start_line,
+                    symbol.start_col,
+                    content,
+                    language,
+                )
 
                 calls = self.tree_sitter.extract_calls(
                     content=content,
@@ -531,13 +564,13 @@ class LanguageTools:
                     (
                         node_id,
                         relative_path,
-                        [(call.name, call.line) for call in calls],
+                        [(call.name, call.line, call.col) for call in calls],
                     )
                 )
 
         edge_index: dict[tuple[str, str], set[tuple[str, int]]] = {}
         for source_id, source_file, calls in call_records:
-            for called_name, line_number in calls:
+            for called_name, line_number, _col_number in calls:
                 target_ids = name_to_node_ids.get(called_name, [])
                 for target_id in target_ids:
                     if target_id == source_id:
@@ -545,6 +578,15 @@ class LanguageTools:
                     edge_index.setdefault((source_id, target_id), set()).add(
                         (source_file, line_number)
                     )
+
+        await self._collect_lsp_reference_edges(
+            edge_index=edge_index,
+            symbol_positions=symbol_positions,
+            node_spans_by_file=node_spans_by_file,
+            call_records=call_records,
+            file_context=file_context,
+            workspace_root=workspace_root,
+        )
 
         edges: list[LangReferenceEdge] = []
         for (source_id, target_id), call_sites in edge_index.items():
@@ -605,9 +647,24 @@ class LanguageTools:
 
         type_result = LangValidateTypeCheck(tool=None, errors=[])
         if "type" in checks:
-            lsp_server = getattr(getattr(self.config, "language", object()), "lsp_servers", {})
-            tool_name = lsp_server.get(language) if isinstance(lsp_server, dict) else None
-            type_result = LangValidateTypeCheck(tool=tool_name, errors=[])
+            tool_name = self.lsp_manager.get_server_name(language)
+            type_errors: list[LangTypeIssue] = []
+            if tool_name:
+                diagnostics = await self.lsp_manager.diagnostics(
+                    language=language,
+                    file_path=resolved_path,
+                    content=content,
+                )
+                type_errors = [
+                    LangTypeIssue(
+                        line=diagnostic.line,
+                        col=diagnostic.col,
+                        message=diagnostic.message,
+                        severity=diagnostic.severity,
+                    )
+                    for diagnostic in diagnostics
+                ]
+            type_result = LangValidateTypeCheck(tool=tool_name, errors=type_errors)
 
         return LangValidateResponse(
             path=resolved_path,
@@ -616,6 +673,210 @@ class LanguageTools:
             lint=lint_result,
             type_check=type_result,
         )
+
+    def _language_lsp_config(self) -> dict[str, str]:
+        language_cfg = getattr(self.config, "language", object())
+        raw = getattr(language_cfg, "lsp_servers", {})
+        if not isinstance(raw, dict):
+            return {}
+        return {
+            str(language): str(command)
+            for language, command in raw.items()
+            if str(command).strip()
+        }
+
+    async def _build_read_file_lsp_enrichments(
+        self,
+        language: str,
+        file_path: str,
+        workspace_root: str,
+        content: str,
+        symbols: list[ExtractedSymbol],
+    ) -> list[LangReadLspEnrichment]:
+        if not symbols:
+            return []
+        if self.lsp_manager.get_server_name(language) is None:
+            return []
+
+        enrichments: list[LangReadLspEnrichment] = []
+        for symbol in symbols:
+            hover = await self.lsp_manager.hover(
+                language=language,
+                file_path=file_path,
+                content=content,
+                line=symbol.start_line,
+                col=symbol.start_col,
+            )
+            definitions = await self.lsp_manager.definitions(
+                language=language,
+                file_path=file_path,
+                content=content,
+                line=symbol.start_line,
+                col=symbol.start_col,
+            )
+
+            definition_models: list[LangReadLspDefinition] = []
+            seen_definitions: set[tuple[str, int, int]] = set()
+            for location in definitions:
+                rel_path = self._relative_path_if_within_workspace(
+                    location.path,
+                    workspace_root,
+                )
+                rendered_path = rel_path or location.path
+                key = (rendered_path, location.line, location.col)
+                if key in seen_definitions:
+                    continue
+                seen_definitions.add(key)
+                definition_models.append(
+                    LangReadLspDefinition(
+                        file=rendered_path,
+                        line=location.line,
+                        col=location.col,
+                    )
+                )
+
+            if hover or definition_models:
+                enrichments.append(
+                    LangReadLspEnrichment(
+                        symbol=symbol.name,
+                        line=symbol.start_line,
+                        hover=hover,
+                        definitions=definition_models,
+                    )
+                )
+
+        return enrichments
+
+    async def _collect_lsp_reference_edges(
+        self,
+        edge_index: dict[tuple[str, str], set[tuple[str, int]]],
+        symbol_positions: dict[str, tuple[str, int, int, str, str]],
+        node_spans_by_file: dict[str, list[tuple[int, int, str]]],
+        call_records: list[tuple[str, str, list[tuple[str, int, int]]]],
+        file_context: dict[str, tuple[str, str, str]],
+        workspace_root: str,
+    ) -> None:
+        for callee_node_id, (
+            file_path,
+            line,
+            col,
+            content,
+            language,
+        ) in symbol_positions.items():
+            if language not in {"javascript", "typescript"}:
+                continue
+            if self.lsp_manager.get_server_name(language) is None:
+                continue
+
+            references = await self.lsp_manager.references(
+                language=language,
+                file_path=file_path,
+                content=content,
+                line=line,
+                col=col,
+            )
+            for ref in references:
+                reference_file = self._relative_path_if_within_workspace(
+                    ref.path,
+                    workspace_root,
+                )
+                if reference_file is None:
+                    continue
+                caller_node_id = self._node_for_call_site(
+                    node_spans_by_file.get(reference_file, []),
+                    ref.line,
+                )
+                if caller_node_id is None or caller_node_id == callee_node_id:
+                    continue
+
+                edge_index.setdefault((caller_node_id, callee_node_id), set()).add(
+                    (reference_file, ref.line)
+                )
+
+        # Some servers (notably TS in common configs) are better at call-site definition
+        # resolution than declaration-reference fanout. Use definition fallback for
+        # unresolved call sites to recover semantic cross-file edges.
+        for source_node_id, source_file, calls in call_records:
+            context = file_context.get(source_file)
+            if context is None:
+                continue
+            source_path, source_content, source_language = context
+            if source_language not in {"javascript", "typescript"}:
+                continue
+            if self.lsp_manager.get_server_name(source_language) is None:
+                continue
+
+            resolved_call_lines = {
+                call_line
+                for (edge_source, _edge_target), call_sites in edge_index.items()
+                if edge_source == source_node_id
+                for call_file, call_line in call_sites
+                if call_file == source_file
+            }
+
+            for _call_name, call_line, call_col in calls:
+                if call_line in resolved_call_lines:
+                    continue
+
+                definitions = await self.lsp_manager.definitions(
+                    language=source_language,
+                    file_path=source_path,
+                    content=source_content,
+                    line=call_line,
+                    col=call_col,
+                )
+                target_node_id: Optional[str] = None
+                for definition in definitions:
+                    definition_file = self._relative_path_if_within_workspace(
+                        definition.path,
+                        workspace_root,
+                    )
+                    if definition_file is None:
+                        continue
+                    candidate = self._node_for_call_site(
+                        node_spans_by_file.get(definition_file, []),
+                        definition.line,
+                    )
+                    if candidate is None or candidate == source_node_id:
+                        continue
+                    target_node_id = candidate
+                    break
+
+                if target_node_id is None:
+                    continue
+
+                edge_index.setdefault((source_node_id, target_node_id), set()).add(
+                    (source_file, call_line)
+                )
+                resolved_call_lines.add(call_line)
+
+    @staticmethod
+    def _node_for_call_site(
+        spans: list[tuple[int, int, str]],
+        line_number: int,
+    ) -> Optional[str]:
+        matches = [
+            (end_line - start_line, node_id)
+            for start_line, end_line, node_id in spans
+            if start_line <= line_number <= end_line
+        ]
+        if not matches:
+            return None
+        matches.sort(key=lambda item: item[0])
+        return matches[0][1]
+
+    @staticmethod
+    def _relative_path_if_within_workspace(
+        path: str,
+        workspace_root: str,
+    ) -> Optional[str]:
+        resolved = os.path.realpath(path)
+        workspace = os.path.realpath(workspace_root)
+        if resolved == workspace:
+            return "."
+        if resolved.startswith(workspace + os.sep):
+            return os.path.relpath(resolved, workspace)
+        return None
 
     def _resolve_workspace_root(self, workspace_dir: Optional[str]) -> str:
         return self.workspace.resolve_path(".", workspace_dir)

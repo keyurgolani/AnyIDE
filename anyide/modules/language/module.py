@@ -335,7 +335,7 @@ class LanguageModule(ToolModule):
         @app.post(
             "/api/tools/language/validate",
             operation_id="lang_validate",
-            summary="Validate Syntax and Linting",
+            summary="Validate Syntax, Linting, and Type Diagnostics",
             response_model=LangValidateResponse,
             tags=["language"],
         )
@@ -350,7 +350,7 @@ class LanguageModule(ToolModule):
         @sub_app.post(
             "/validate",
             operation_id="lang_validate",
-            summary="Validate Syntax and Linting",
+            summary="Validate Syntax, Linting, and Type Diagnostics",
             response_model=LangValidateResponse,
             tags=["language"],
         )
