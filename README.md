@@ -52,6 +52,8 @@ Built-in admin dashboard provides human oversight, HITL (Human-in-the-Loop) appr
 - **Audit Logging:** Complete execution history
 - **Policy Engine:** Allow/block/HITL rules per tool
 - **Secret Management:** Secure secret resolution with `{{secret:KEY}}` template syntax
+- **System LLM Capability (Admin-Managed):** Central `llm.endpoints` config with provider adapters (OpenAI/OpenAI-compatible/Ollama, Anthropic, Google) for internal modules
+  - Exposed through admin/config surfaces only, not as `/api/tools/*` endpoints
 - **HTTP Client:** Make outbound HTTP requests with SSRF protection, domain filtering, and secret injection
 - **Knowledge Graph Memory:** 12 tools for persistent knowledge storage with FTS5 search and graph traversal
   - Improved natural-language memory search recall (question-style queries)
@@ -255,6 +257,25 @@ modules:
 
 Environment variable `ANYIDE_MODULES` overrides `modules.enabled/disabled`.
 
+### LLM Endpoints (`config.yaml`)
+
+LLM endpoint configuration is a **system capability** (for internal modules and admin workflows), not a tool module.
+
+```yaml
+llm:
+  endpoints:
+    - id: "primary"
+      provider: "openai"                 # openai | openai_compatible | ollama | anthropic | google
+      base_url: "https://api.openai.com/v1"
+      api_key_secret: "OPENAI_API_KEY"   # optional for ollama
+      default_model: "gpt-4o-mini"
+      timeout: 60
+```
+
+Admin-only LLM APIs:
+- `GET /admin/api/llm/endpoints` (sanitized endpoint list)
+- `POST /admin/api/llm/test` (connectivity test for one endpoint)
+
 ### Secrets File
 
 Create `secrets.env` with your sensitive values:
@@ -347,6 +368,7 @@ services:
   - View current server configuration
   - HTTP settings and policy rules
   - Workspace and database paths
+  - Sanitized LLM endpoint inventory and endpoint test actions
 - **Enhanced System Health Page:**
   - Real-time CPU and memory usage with progress bars
   - Database and workspace disk sizes
@@ -537,6 +559,8 @@ http://localhost:8080/admin/
 │   │   ├── audit.py       # Audit logger
 │   │   ├── database.py    # SQLite access
 │   │   ├── hitl.py        # HITL manager
+│   │   ├── llm_client.py  # Unified system LLM client
+│   │   ├── llm_adapters/  # Provider adapters (OpenAI/Anthropic/Google)
 │   │   ├── policy.py      # Policy engine
 │   │   ├── secrets.py     # Secret resolver
 │   │   └── workspace.py   # Workspace/path security
@@ -635,6 +659,7 @@ npm run dev
 ### Core Platform
 - FastAPI service exposes MCP (`/mcp`) and OpenAPI (`/api/tools/*`) interfaces from one backend.
 - SQLite persists audit history, HITL state, memory graph data, and plan orchestration state.
+- Unified LLM access is a shared system capability (`llm.endpoints` + `LLMClient`), not an LLM-visible tool category.
 
 ### Security and Governance
 - Workspace boundary enforcement prevents path traversal and out-of-scope file access.
@@ -645,6 +670,7 @@ npm run dev
 ### Admin Experience
 - Password-protected dashboard with real-time HITL queue, health metrics, and recent activity.
 - Tool explorer, configuration viewer, audit filtering/export, and container log views.
+- Admin configuration surfaces include LLM endpoint listing and direct connectivity testing.
 - Session expiry handling redirects users to `/admin/login` after unauthorized responses.
 - Admin API accepts session cookies and `Authorization: Bearer <token>` fallback.
 - Dashboard API/WebSocket clients support reverse-proxy path prefixes.
@@ -655,11 +681,12 @@ npm run dev
 - DAG plan orchestration with ready-task snapshots, task references, and configurable failure policies.
 
 ### Test Coverage Snapshot
-- `pytest --collect-only -q` reports 437 backend tests.
+- `pytest --collect-only -q` reports 457 backend tests.
 - Memory tool suite: 48 tests.
 - Plan orchestration suite: 22 tests.
 - HITL WebSocket roundtrip tests: 7 tests.
 - Tool Explorer contract tests: 13 tests.
+- LLM endpoint/config coverage: config validation + client/adapter normalization + admin endpoint behavior.
 - Frontend admin auth/session tests run with Vitest + jsdom.
 
 ---
@@ -727,14 +754,14 @@ Built following the design principles from:
 
 The project includes comprehensive test coverage.
 
-As of this snapshot, `pytest --collect-only -q` reports **437 tests collected** across:
+As of this snapshot, `pytest --collect-only -q` reports **457 tests collected** across:
 
 - Unit tests for core modules and tool implementations
 - API and admin endpoint integration tests
 - MCP protocol and HITL workflow tests
 - Security regression tests (path traversal, SSRF, auth enforcement, input handling)
 - Load/concurrency tests for frequent file and API operations
-- Feature-specific suites for Git, Docker, memory graph, plan orchestration, secrets, and HTTP
+- Feature-specific suites for Git, Docker, memory graph, plan orchestration, secrets, HTTP, and LLM config/client layers
 - Tool Explorer contract tests verifying OpenAPI-based tool listing
 - HITL WebSocket roundtrip and disconnect resilience tests
 - Frontend unit tests (Vitest + jsdom) for admin auth/session behavior

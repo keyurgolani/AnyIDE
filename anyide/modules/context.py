@@ -23,6 +23,7 @@ class ModuleContext:
     tool_dispatch: Callable[[str, str, dict], Any]
     tool_dispatch_targets: dict[str, Any] = field(default_factory=dict)
     enabled_modules: list[str] = field(default_factory=list)
+    llm_client: Any = None
 
     def register_dispatch_target(self, category: str, target: Any) -> None:
         """Register an object whose methods are invokable by plan tool dispatch."""

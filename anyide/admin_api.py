@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Response, Cookie, Depends, Header
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from anyide.config import Config
 from anyide.core.audit import AuditLogger
@@ -96,6 +96,16 @@ class ToolListResponse(BaseModel):
     total: int
 
 
+class AdminLLMEndpoint(BaseModel):
+    """Sanitized LLM endpoint configuration for admin surfaces."""
+    id: str
+    provider: str
+    base_url: str
+    default_model: str
+    timeout: int
+    has_api_key: bool
+
+
 class ConfigResponse(BaseModel):
     """Configuration response (sanitized)."""
     auth_enabled: bool
@@ -105,6 +115,32 @@ class ConfigResponse(BaseModel):
     http_config: Dict[str, Any]
     policy_rules_count: int
     tool_configs: Dict[str, Any]
+    llm_endpoints: List[AdminLLMEndpoint]
+
+
+class AdminLLMEndpointListResponse(BaseModel):
+    """Admin response for listing configured LLM endpoints."""
+    endpoints: List[AdminLLMEndpoint]
+    total: int
+
+
+class AdminLLMTestRequest(BaseModel):
+    """Admin request for testing a configured LLM endpoint."""
+    endpoint_id: str
+    prompt: str = "Respond with exactly: OK"
+    max_tokens: int = Field(32, ge=1, le=1024)
+
+
+class AdminLLMTestResponse(BaseModel):
+    """Admin response for LLM endpoint connectivity test."""
+    endpoint_id: str
+    provider: str
+    model: str
+    success: bool
+    latency_ms: Optional[int] = None
+    response_preview: Optional[str] = None
+    error_type: Optional[str] = None
+    error_message: Optional[str] = None
 
 
 class AuditLogFilterResponse(BaseModel):
@@ -387,7 +423,16 @@ async def get_detailed_health(session_token: str = Depends(require_auth)):
 # ---------------------------------------------------------------------------
 
 # Valid tool categories derived from mounted sub-apps
-TOOL_CATEGORIES = ["fs", "workspace", "shell", "git", "docker", "http", "memory", "plan"]
+TOOL_CATEGORIES = [
+    "fs",
+    "workspace",
+    "shell",
+    "git",
+    "docker",
+    "http",
+    "memory",
+    "plan",
+]
 
 
 def _extract_tools_from_openapi(openapi_schema: dict, policy_engine) -> List[ToolSchema]:
@@ -604,6 +649,87 @@ async def get_tool_schema(
 # Configuration Viewer
 # ---------------------------------------------------------------------------
 
+def _sanitize_llm_endpoints(config: Config) -> List[AdminLLMEndpoint]:
+    """Return sanitized LLM endpoint metadata for admin APIs."""
+    endpoints: List[AdminLLMEndpoint] = []
+    llm_cfg = getattr(config, "llm", None)
+    if llm_cfg is None:
+        return endpoints
+
+    for endpoint in getattr(llm_cfg, "endpoints", []):
+        endpoints.append(
+            AdminLLMEndpoint(
+                id=endpoint.id,
+                provider=endpoint.provider,
+                base_url=endpoint.base_url,
+                default_model=endpoint.default_model,
+                timeout=endpoint.timeout,
+                has_api_key=bool(endpoint.api_key_secret),
+            )
+        )
+    return endpoints
+
+
+@router.get("/llm/endpoints", response_model=AdminLLMEndpointListResponse)
+async def list_llm_endpoints(session_token: str = Depends(require_auth)):
+    """List configured LLM endpoints (sanitized)."""
+    from anyide.main import config
+
+    endpoints = _sanitize_llm_endpoints(config)
+    return AdminLLMEndpointListResponse(endpoints=endpoints, total=len(endpoints))
+
+
+@router.post("/llm/test", response_model=AdminLLMTestResponse)
+async def test_llm_endpoint(
+    request: AdminLLMTestRequest,
+    session_token: str = Depends(require_auth),
+):
+    """Test connectivity for one configured LLM endpoint."""
+    from anyide.core.llm_client import LLMClientError
+    from anyide.main import llm_client
+
+    try:
+        response = await llm_client.complete(
+            endpoint_id=request.endpoint_id,
+            messages=[{"role": "user", "content": request.prompt}],
+            max_tokens=request.max_tokens,
+        )
+        preview = response.content.strip()
+        if len(preview) > 200:
+            preview = preview[:200] + "..."
+
+        return AdminLLMTestResponse(
+            endpoint_id=request.endpoint_id,
+            provider=response.provider,
+            model=response.model,
+            success=True,
+            latency_ms=response.latency_ms,
+            response_preview=preview,
+            error_type=None,
+            error_message=None,
+        )
+    except LLMClientError as exc:
+        provider = exc.provider or "unknown"
+        model = "unknown"
+        try:
+            endpoint = llm_client.get_endpoint(request.endpoint_id)
+            provider = endpoint.provider
+            model = endpoint.default_model
+        except Exception:
+            pass
+
+        return AdminLLMTestResponse(
+            endpoint_id=request.endpoint_id,
+            provider=provider,
+            model=model,
+            success=False,
+            latency_ms=None,
+            response_preview=None,
+            error_type=exc.error_type,
+            error_message=exc.message,
+        )
+
+
 @router.get("/config", response_model=ConfigResponse)
 async def get_config(session_token: str = Depends(require_auth)):
     """Get current configuration (sanitized for security)."""
@@ -643,6 +769,7 @@ async def get_config(session_token: str = Depends(require_auth)):
         http_config=http_config,
         policy_rules_count=policy_rules_count,
         tool_configs=tool_configs,
+        llm_endpoints=_sanitize_llm_endpoints(config),
     )
 
 

@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
   Settings, Shield, Database, Folder, Globe, Wrench,
-  CheckCircle, AlertCircle, RefreshCw
+  CheckCircle, AlertCircle, RefreshCw, Bot, Zap
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -10,9 +11,18 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 
 export default function ConfigPage() {
+  const [llmTestResults, setLlmTestResults] = useState<Record<string, any>>({})
+
   const { data: config, isLoading, refetch } = useQuery({
     queryKey: ['config'],
     queryFn: () => api.getConfig(),
+  })
+
+  const llmTestMutation = useMutation({
+    mutationFn: (endpointId: string) => api.testLLMEndpoint(endpointId),
+    onSuccess: (result) => {
+      setLlmTestResults((prev) => ({ ...prev, [result.endpoint_id]: result }))
+    },
   })
 
   if (isLoading) {
@@ -166,6 +176,76 @@ export default function ConfigPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="w-5 h-5" />
+                LLM Endpoints
+              </CardTitle>
+              <CardDescription>
+                System-level LLM capability configured via `config.yaml` and tested from admin
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(config?.llm_endpoints || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">No LLM endpoints configured.</p>
+              ) : (
+                <div className="space-y-3">
+                  {(config?.llm_endpoints || []).map((endpoint: any) => {
+                    const result = llmTestResults[endpoint.id]
+                    return (
+                      <div
+                        key={endpoint.id}
+                        className="p-4 rounded-lg bg-accent/30 border border-border/50 space-y-2"
+                      >
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                          <div>
+                            <p className="font-medium">{endpoint.id}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {endpoint.provider} · {endpoint.default_model}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => llmTestMutation.mutate(endpoint.id)}
+                            disabled={llmTestMutation.isPending}
+                          >
+                            <Zap className="w-4 h-4 mr-2" />
+                            Test Endpoint
+                          </Button>
+                        </div>
+                        <p className="text-xs font-mono text-muted-foreground break-all">{endpoint.base_url}</p>
+                        {result && (
+                          <div className="text-xs">
+                            <Badge variant={result.success ? 'success' : 'error'}>
+                              {result.success ? 'Reachable' : 'Failed'}
+                            </Badge>
+                            {result.success && (
+                              <span className="ml-2 text-muted-foreground">
+                                {result.latency_ms} ms · {result.model}
+                              </span>
+                            )}
+                            {!result.success && result.error_message && (
+                              <p className="mt-2 text-red-400">{result.error_message}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Tool Configurations */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45 }}
           className="lg:col-span-2"
         >
           <Card>

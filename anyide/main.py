@@ -21,6 +21,7 @@ from anyide.core.audit import AuditLogger
 from anyide.config import get_admin_password_source, load_config
 from anyide.core.database import Database
 from anyide.core.hitl import HITLManager
+from anyide.core.llm_client import LLMClient
 from anyide.logging_config import get_logger, setup_logging
 from anyide.modules import ModuleContext, ModuleRegistry, ModuleResolutionError
 from anyide.core.policy import PolicyEngine
@@ -44,6 +45,7 @@ audit_logger = AuditLogger(db)
 policy_engine = PolicyEngine(config)
 hitl_manager = HITLManager(db, config.hitl.default_ttl_seconds)
 secret_manager = SecretManager(config.secrets.file)
+llm_client = LLMClient(config.llm, secret_manager)
 
 # Compatibility globals expected by admin API and tests.
 fs_tools = None
@@ -609,6 +611,7 @@ module_context = ModuleContext(
     execute_tool=execute_tool,
     resolve_request_secrets=resolve_request_secrets,
     tool_dispatch=_tool_dispatch,
+    llm_client=llm_client,
 )
 
 module_registry = ModuleRegistry(module_context)

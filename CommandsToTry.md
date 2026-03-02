@@ -23,6 +23,35 @@ The dashboard provides a unified widget-based interface:
 - Fully responsive design for mobile, tablet, and desktop
 - Automatic redirect to `/admin/login` when session expires (401 handling)
 
+## Admin LLM Endpoint Controls (System Capability)
+
+LLM endpoint config is an admin/system feature (`config.yaml` + admin API), not a tool module.
+
+**"List configured LLM endpoints from the admin API"**
+- Calls `GET /admin/api/llm/endpoints`
+- Returns endpoint IDs, providers, models, base URLs, timeout, and API-key presence flag (no secret values)
+
+**"Test connectivity for the primary LLM endpoint"**
+- Calls `POST /admin/api/llm/test` with `endpoint_id`
+- Returns normalized success/failure, latency, and error type/message
+
+```bash
+# Login and export admin token
+TOKEN=$(curl -s -X POST http://localhost:8080/admin/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"password":"admin"}' | jq -r '.token')
+
+# List configured endpoints (sanitized)
+curl -s http://localhost:8080/admin/api/llm/endpoints \
+  -H "Authorization: Bearer $TOKEN" | jq
+
+# Test one endpoint
+curl -s -X POST http://localhost:8080/admin/api/llm/test \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"endpoint_id":"primary","prompt":"Respond with exactly: OK"}' | jq
+```
+
 ## Protocol Support
 
 AnyIDE supports two protocols:
@@ -30,6 +59,7 @@ AnyIDE supports two protocols:
 - **MCP (Model Context Protocol)**: Modern protocol for AI tool integration using Streamable HTTP
 
 Both protocols expose the same tools from a single source of truth - no code duplication.
+Admin-only system capabilities (like LLM endpoint config/testing) remain outside MCP and `/api/tools/*`.
 
 ## Getting Started
 
@@ -815,6 +845,8 @@ When using REST API directly:
 - `GET /admin/api/health` - System health (admin auth required)
 - `GET /admin/api/secrets` - List loaded secret key names (admin auth required)
 - `POST /admin/api/secrets/reload` - Reload secrets from file (admin auth required)
+- `GET /admin/api/llm/endpoints` - List sanitized configured LLM endpoints (admin auth required)
+- `POST /admin/api/llm/test` - Test one configured LLM endpoint (admin auth required)
 - Protected admin endpoints accept session cookie or `Authorization: Bearer <token>`
 
 ## Plan Tools (DAG Orchestration)

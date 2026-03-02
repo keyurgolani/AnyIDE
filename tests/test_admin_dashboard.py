@@ -209,7 +209,7 @@ class TestConfigEndpoint:
         # Check required fields
         required_fields = [
             "auth_enabled", "workspace_path", "database_path",
-            "log_level", "http_config", "policy_rules_count", "tool_configs"
+            "log_level", "http_config", "policy_rules_count", "tool_configs", "llm_endpoints"
         ]
 
         for field in required_fields:
@@ -275,6 +275,46 @@ class TestAuditLogFiltering:
         # All returned logs should have status=success
         for log in data["logs"]:
             assert log["status"] == "success"
+
+
+class TestLLMAdminEndpoints:
+    """Tests for admin-only LLM configuration endpoints."""
+
+    @pytest.mark.asyncio
+    async def test_list_llm_endpoints_requires_auth(self, client):
+        response = await client.get("/admin/api/llm/endpoints")
+        assert response.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_list_llm_endpoints_returns_sanitized_list(self, client, auth_headers):
+        response = await client.get("/admin/api/llm/endpoints", cookies=auth_headers)
+        assert response.status_code == 200
+
+        data = response.json()
+        assert "endpoints" in data
+        assert "total" in data
+        assert isinstance(data["endpoints"], list)
+
+    @pytest.mark.asyncio
+    async def test_llm_test_endpoint_requires_auth(self, client):
+        response = await client.post(
+            "/admin/api/llm/test",
+            json={"endpoint_id": "missing"},
+        )
+        assert response.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_llm_test_endpoint_handles_unknown_endpoint(self, client, auth_headers):
+        response = await client.post(
+            "/admin/api/llm/test",
+            json={"endpoint_id": "missing"},
+            cookies=auth_headers,
+        )
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["success"] is False
+        assert data["error_type"] == "config_error"
 
     @pytest.mark.asyncio
     async def test_filtered_audit_logs_with_category_filter(self, client, auth_headers):

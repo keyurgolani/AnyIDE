@@ -98,6 +98,19 @@ class SecretManager:
         """Return number of loaded secrets."""
         return len(self._secrets)
 
+    def get(self, key: str) -> str:
+        """Return the raw secret value for a key.
+
+        This is intended for internal execution-time integrations only.
+        Callers must never expose returned values in API responses/logs.
+        """
+        if key not in self._secrets:
+            raise SecretNotFoundError(
+                f"Secret key '{key}' not found. "
+                f"Available keys: {', '.join(self.list_keys()) or '(none)'}"
+            )
+        return self._secrets[key]
+
     # ------------------------------------------------------------------
     # Template resolution
     # ------------------------------------------------------------------

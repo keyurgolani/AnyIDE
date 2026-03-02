@@ -86,6 +86,32 @@ export interface ConfigResponse {
   http_config: Record<string, any>
   policy_rules_count: number
   tool_configs: Record<string, any>
+  llm_endpoints: LLMEndpointSummary[]
+}
+
+export interface LLMEndpointSummary {
+  id: string
+  provider: string
+  base_url: string
+  default_model: string
+  timeout: number
+  has_api_key: boolean
+}
+
+export interface LLMEndpointListResponse {
+  endpoints: LLMEndpointSummary[]
+  total: number
+}
+
+export interface LLMEndpointTestResponse {
+  endpoint_id: string
+  provider: string
+  model: string
+  success: boolean
+  latency_ms?: number
+  response_preview?: string
+  error_type?: string
+  error_message?: string
 }
 
 export interface AuditLogFilterResponse {
@@ -327,6 +353,33 @@ export class API {
 
     if (!response.ok) {
       throw new Error('Failed to fetch config')
+    }
+
+    return response.json()
+  }
+
+  async getLLMEndpoints(): Promise<LLMEndpointListResponse> {
+    const response = await this.request('/admin/api/llm/endpoints')
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch LLM endpoints')
+    }
+
+    return response.json()
+  }
+
+  async testLLMEndpoint(endpointId: string, prompt?: string): Promise<LLMEndpointTestResponse> {
+    const response = await this.request('/admin/api/llm/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        endpoint_id: endpointId,
+        ...(prompt ? { prompt } : {}),
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to test LLM endpoint')
     }
 
     return response.json()

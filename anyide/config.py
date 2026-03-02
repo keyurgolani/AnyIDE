@@ -2,10 +2,10 @@
 
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -73,6 +73,75 @@ class ModulesConfig(BaseModel):
     disabled: List[str] = Field(default_factory=list)
 
 
+class LLMEndpointConfig(BaseModel):
+    """LLM endpoint configuration."""
+
+    id: str = Field(..., description="Unique endpoint identifier")
+    provider: Literal[
+        "openai",
+        "openai_compatible",
+        "ollama",
+        "anthropic",
+        "google",
+    ] = Field(..., description="LLM provider type")
+    base_url: str = Field(..., description="Provider API base URL")
+    api_key_secret: Optional[str] = Field(
+        None,
+        description="Secret key name containing API key (required except for ollama)",
+    )
+    default_model: str = Field(..., description="Default model for the endpoint")
+    max_tokens: Optional[int] = Field(
+        None,
+        ge=1,
+        description="Default max output tokens",
+    )
+    temperature: Optional[float] = Field(
+        None,
+        ge=0,
+        le=2,
+        description="Default sampling temperature",
+    )
+    timeout: int = Field(60, gt=0, description="Request timeout in seconds")
+
+    @field_validator("id", "default_model", "base_url")
+    @classmethod
+    def _must_not_be_blank(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("must not be blank")
+        return trimmed
+
+    @field_validator("api_key_secret")
+    @classmethod
+    def _normalize_api_key_secret(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        trimmed = value.strip()
+        return trimmed or None
+
+    @model_validator(mode="after")
+    def _validate_provider_requirements(self) -> "LLMEndpointConfig":
+        if self.provider != "ollama" and not self.api_key_secret:
+            raise ValueError(
+                f"api_key_secret is required for provider '{self.provider}'"
+            )
+        return self
+
+
+class LLMConfig(BaseModel):
+    """LLM configuration."""
+
+    endpoints: List[LLMEndpointConfig] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_unique_endpoint_ids(self) -> "LLMConfig":
+        ids = [endpoint.id for endpoint in self.endpoints]
+        duplicates = sorted({endpoint_id for endpoint_id in ids if ids.count(endpoint_id) > 1})
+        if duplicates:
+            raise ValueError(f"Duplicate llm endpoint id(s): {duplicates}")
+        return self
+
+
 class ToolsConfig(BaseModel):
     """Tools configuration."""
     defaults: ToolPolicyConfig = Field(default_factory=lambda: ToolPolicyConfig(workspace_override="hitl"))
@@ -93,6 +162,7 @@ class Config(BaseModel):
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
     http: HttpConfig = Field(default_factory=HttpConfig)
     modules: ModulesConfig = Field(default_factory=ModulesConfig)
+    llm: LLMConfig = Field(default_factory=LLMConfig)
 
 
 def get_admin_password_override() -> tuple[Optional[str], Optional[str]]:
