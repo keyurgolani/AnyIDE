@@ -119,6 +119,40 @@ class TestSkillsAPI:
         assert "helper" in read_file_resp.json()["content"]
 
     @pytest.mark.asyncio
+    async def test_skills_read_accepts_skill_id_alias(self, client):
+        response = await client.post(
+            "/api/tools/skills/read",
+            json={"skill_id": "sample-skill"},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["name"] == "sample-skill"
+
+    @pytest.mark.asyncio
+    async def test_skills_read_file_accepts_skill_name_alias(self, client):
+        response = await client.post(
+            "/api/tools/skills/read_file",
+            json={"skill_name": "sample-skill", "file_path": "scripts/helper.sh"},
+        )
+
+        assert response.status_code == 200
+        assert "helper" in response.json()["content"]
+
+    @pytest.mark.asyncio
+    async def test_skills_openapi_guides_correct_field_usage(self, client):
+        response = await client.get("/openapi.json")
+        assert response.status_code == 200
+        payload = response.json()
+
+        read_desc = payload["paths"]["/api/tools/skills/read"]["post"]["description"]
+        assert "Use `skills_list` first" in read_desc
+        assert "skill_id" in read_desc
+
+        name_prop = payload["components"]["schemas"]["SkillsReadRequest"]["properties"]["name"]
+        assert "skill_id" in name_prop["description"]
+        assert "skill_name" in name_prop["description"]
+
+    @pytest.mark.asyncio
     async def test_skills_search_uses_cli_parsing(self, client, monkeypatch):
         from anyide import main as main_module
 

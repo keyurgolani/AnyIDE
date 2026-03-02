@@ -22,24 +22,39 @@ from anyide.modules.skills.tools import SkillsTools
 _LIST_DESC = """List all installed skills from the isolated /skills directory.
 
 This tool is offline-capable and only reads local files.
-No workspace path resolution is used."""
+No workspace path resolution is used.
+
+Use `skills_list` first before `skills_read` or `skills_read_file` so the model has a valid skill name."""
 
 _READ_DESC = """Read a skill's SKILL.md content.
+
+Use `skills_list` first, then call `skills_read` with `name`.
+Compatibility aliases are accepted: `skill_id`, `skill_name`.
 
 Optional `section` allows extracting a specific markdown section by header text."""
 
 _READ_FILE_DESC = """Read a specific file inside an installed skill directory.
 
-The provided `file_path` must resolve within the selected skill directory."""
+Use `skills_list` first and pass the selected skill as `name`
+(compatibility aliases: `skill_id`, `skill_name`).
+
+The provided `file_path` must be a relative path and resolve within the selected skill directory."""
 
 _SEARCH_DESC = """Search available skills using the skills CLI registry.
 
 Runs `npx skills find <query> --json` and parses structured results.
-Requires outbound network access."""
+Requires outbound network access.
+
+If remote search is unavailable, fall back to local workflows:
+`skills_list` -> `skills_read` -> `skills_read_file`."""
 
 _INSTALL_DESC = """Install a skill from a remote repository using the skills CLI.
 
 Runs `npx skills add <repo> [--skill <name>] --global -y`.
+Request body fields:
+- `repo`: source repository (for example `vercel-labs/agent-skills`)
+- `skill_name` (or alias `skill_id`): optional skill within that repo
+
 This operation is HITL-gated by default because it downloads and executes external code."""
 
 
@@ -237,4 +252,3 @@ class SkillsModule(ToolModule):
                 force_hitl=True,
                 hitl_reason="skills_install requires approval (downloads and executes code from the internet)",
             )
-

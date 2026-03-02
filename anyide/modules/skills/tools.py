@@ -32,6 +32,10 @@ logger = get_logger(__name__)
 class SkillsTools:
     """Tools for listing, reading, searching, and installing skills."""
 
+    SKILL_NAME_GUIDANCE = (
+        "Use skills_list first and pass an installed skill as `name` "
+        "(compatibility aliases: `skill_id`, `skill_name`)."
+    )
     SECTION_HEADER_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
     ANSI_ESCAPE_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
     PLAIN_SEARCH_LINE_RE = re.compile(
@@ -105,7 +109,11 @@ class SkillsTools:
         target = (skill_dir / request.file_path).resolve()
 
         if not self._is_within(target, skill_dir):
-            raise ValueError("Requested file resolves outside skill directory")
+            raise ValueError(
+                "Requested file resolves outside skill directory. "
+                "Use a relative path inside the selected skill "
+                "(for example `references/example.txt`)."
+            )
         if not target.exists() or not target.is_file():
             raise FileNotFoundError(
                 f"File not found in skill '{request.name}': {request.file_path}"
@@ -198,13 +206,19 @@ class SkillsTools:
     def _resolve_skill_dir(self, skill_name: str) -> Path:
         normalized = skill_name.strip()
         if not normalized:
-            raise ValueError("Skill name cannot be empty")
+            raise ValueError(f"Skill name cannot be empty. {self.SKILL_NAME_GUIDANCE}")
 
         skill_dir = (Path(self.base_dir) / normalized).resolve()
         if not self._is_within(skill_dir, Path(self.base_dir)):
-            raise ValueError("Skill path resolves outside skills directory")
+            raise ValueError(
+                "Skill path resolves outside skills directory. "
+                f"{self.SKILL_NAME_GUIDANCE}"
+            )
         if not skill_dir.exists() or not skill_dir.is_dir():
-            raise FileNotFoundError(f"Skill not found: {normalized}")
+            raise FileNotFoundError(
+                f"Skill not found: {normalized}. "
+                "Call skills_list to discover valid installed skill names."
+            )
         if not (skill_dir / "SKILL.md").is_file():
             raise FileNotFoundError(f"SKILL.md not found for skill '{normalized}'")
         return skill_dir
@@ -321,7 +335,17 @@ class SkillsTools:
                 break
 
         if start_index is None or start_level is None:
-            raise ValueError(f"Section '{section_name}' not found in SKILL.md")
+            headings = self._list_markdown_headings(markdown)
+            if headings:
+                available = ", ".join(headings)
+                raise ValueError(
+                    f"Section '{section_name}' not found in SKILL.md. "
+                    f"Available sections: {available}"
+                )
+            raise ValueError(
+                f"Section '{section_name}' not found in SKILL.md. "
+                "No markdown headings were found."
+            )
 
         collected: list[str] = []
         for line in lines[start_index:]:
@@ -399,6 +423,17 @@ class SkillsTools:
 
     def _strip_ansi(self, text: str) -> str:
         return self.ANSI_ESCAPE_RE.sub("", text)
+
+    def _list_markdown_headings(self, markdown: str) -> list[str]:
+        headings: list[str] = []
+        for line in markdown.splitlines():
+            match = self.SECTION_HEADER_RE.match(line)
+            if not match:
+                continue
+            heading = match.group(2).strip()
+            if heading and heading not in headings:
+                headings.append(heading)
+        return headings
 
     def _is_within(self, target: Path, base: Path) -> bool:
         try:

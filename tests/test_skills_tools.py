@@ -87,8 +87,22 @@ async def test_skills_read_section_and_metadata(skills_tools: SkillsTools):
 
 
 @pytest.mark.asyncio
+async def test_skills_read_rejects_blank_name_with_guidance(skills_tools: SkillsTools):
+    with pytest.raises(ValueError, match="Use skills_list"):
+        await skills_tools.read(SkillsReadRequest(name="   "))
+
+
+@pytest.mark.asyncio
+async def test_skills_read_section_error_lists_available_sections(skills_tools: SkillsTools):
+    with pytest.raises(ValueError, match="Available sections"):
+        await skills_tools.read(
+            SkillsReadRequest(name="sample-skill", section="MissingSection")
+        )
+
+
+@pytest.mark.asyncio
 async def test_skills_read_file_blocks_escape(skills_tools: SkillsTools):
-    with pytest.raises(ValueError, match="outside skill directory"):
+    with pytest.raises(ValueError, match="relative path"):
         await skills_tools.read_file(
             SkillsReadFileRequest(
                 name="sample-skill",

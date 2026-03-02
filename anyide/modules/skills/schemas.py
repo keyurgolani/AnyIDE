@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+
+
+class SkillsRequestBase(BaseModel):
+    """Base class for request schemas with strict payload validation."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
 
 class SkillsListItem(BaseModel):
@@ -24,13 +30,35 @@ class SkillsListResponse(BaseModel):
     total: int = Field(..., description="Total installed skills count")
 
 
-class SkillsReadRequest(BaseModel):
+class SkillsReadRequest(SkillsRequestBase):
     """Request model for skills_read."""
 
-    name: str = Field(..., description="Installed skill name")
+    name: str = Field(
+        ...,
+        min_length=1,
+        validation_alias=AliasChoices("name", "skill_id", "skill_name"),
+        description=(
+            "Installed skill name from `skills_list`. "
+            "Aliases accepted for compatibility: `skill_id`, `skill_name`."
+        ),
+        examples=["demo-local-skill"],
+    )
     section: Optional[str] = Field(
         None,
+        min_length=1,
         description="Optional markdown section header to extract (e.g., 'Usage')",
+        examples=["Usage"],
+    )
+
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+        json_schema_extra={
+            "examples": [
+                {"name": "demo-local-skill"},
+                {"skill_id": "demo-local-skill", "section": "Usage"},
+            ]
+        },
     )
 
 
@@ -52,13 +80,35 @@ class SkillsReadResponse(BaseModel):
     )
 
 
-class SkillsReadFileRequest(BaseModel):
+class SkillsReadFileRequest(SkillsRequestBase):
     """Request model for skills_read_file."""
 
-    name: str = Field(..., description="Installed skill name")
+    name: str = Field(
+        ...,
+        min_length=1,
+        validation_alias=AliasChoices("name", "skill_id", "skill_name"),
+        description=(
+            "Installed skill name from `skills_list`. "
+            "Aliases accepted for compatibility: `skill_id`, `skill_name`."
+        ),
+        examples=["demo-local-skill"],
+    )
     file_path: str = Field(
         ...,
+        min_length=1,
         description="Relative file path within the skill directory",
+        examples=["references/example.txt", "scripts/install.sh"],
+    )
+
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+        json_schema_extra={
+            "examples": [
+                {"name": "demo-local-skill", "file_path": "references/example.txt"},
+                {"skill_name": "demo-local-skill", "file_path": "scripts/install.sh"},
+            ]
+        },
     )
 
 
@@ -69,11 +119,22 @@ class SkillsReadFileResponse(BaseModel):
     path: str = Field(..., description="Resolved absolute file path")
 
 
-class SkillsSearchRequest(BaseModel):
+class SkillsSearchRequest(SkillsRequestBase):
     """Request model for skills_search."""
 
-    query: str = Field(..., min_length=1, description="Skills search query")
+    query: str = Field(
+        ...,
+        min_length=1,
+        description="Skills search query",
+        examples=["vitest", "react testing", "fastapi templates"],
+    )
     max_results: int = Field(10, ge=1, le=50, description="Maximum number of results")
+
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+        json_schema_extra={"examples": [{"query": "vitest", "max_results": 5}]},
+    )
 
 
 class SkillsSearchResult(BaseModel):
@@ -93,13 +154,32 @@ class SkillsSearchResponse(BaseModel):
     total: int = Field(..., description="Number of returned results")
 
 
-class SkillsInstallRequest(BaseModel):
+class SkillsInstallRequest(SkillsRequestBase):
     """Request model for skills_install."""
 
-    repo: str = Field(..., description="Repository path, e.g. vercel-labs/agent-skills")
+    repo: str = Field(
+        ...,
+        min_length=3,
+        description="Repository path, e.g. vercel-labs/agent-skills",
+        examples=["vercel-labs/agent-skills"],
+    )
     skill_name: Optional[str] = Field(
         None,
+        min_length=1,
+        validation_alias=AliasChoices("skill_name", "skill_id"),
         description="Optional skill name to install from the repository",
+        examples=["vitest"],
+    )
+
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+        json_schema_extra={
+            "examples": [
+                {"repo": "vercel-labs/agent-skills", "skill_name": "vitest"},
+                {"repo": "vercel-labs/agent-skills", "skill_id": "vitest"},
+            ]
+        },
     )
 
 
@@ -113,4 +193,3 @@ class SkillsInstallResponse(BaseModel):
         ...,
         description="Preview of SKILL.md (first 500 characters)",
     )
-
