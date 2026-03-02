@@ -18,7 +18,7 @@ from fastapi_mcp import FastApiMCP
 from pydantic import BaseModel
 
 from anyide.core.audit import AuditLogger
-from anyide.config import load_config
+from anyide.config import get_admin_password_source, load_config
 from anyide.core.database import Database
 from anyide.core.hitl import HITLManager
 from anyide.logging_config import get_logger, setup_logging
@@ -225,6 +225,7 @@ def resolve_request_secrets(request):
 async def lifespan(_app: FastAPI):
     """Application lifespan manager."""
     logger.info("starting_hostbridge", version="0.1.0")
+    logger.info("admin_password_source", source=get_admin_password_source(config))
     _app.state.start_time = time.time()
 
     await db.connect()

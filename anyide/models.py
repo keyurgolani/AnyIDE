@@ -680,19 +680,60 @@ class PlanStatusResponse(BaseModel):
 
 
 class PlanExecuteRequest(BaseModel):
-    """Request to execute a plan."""
+    """Request to evaluate a plan and return currently ready tasks."""
     plan_id: str = Field(..., description="Plan reference. Prefer the plan_id returned by plan_create; unique plan names are also accepted.")
-    timeout: int = Field(3600, description="Maximum execution time in seconds (default 1 hour)")
+    timeout: int = Field(3600, description="Reserved for client-side orchestration; not used by the server.")
+
+
+class PlanReadyTask(BaseModel):
+    """A task that is currently ready for the LLM/orchestrator to execute."""
+    id: str = Field(..., description="Task ID")
+    name: str = Field(..., description="Human-readable task name")
+    tool_category: str = Field(..., description="Tool category")
+    tool_name: str = Field(..., description="Tool name")
+    resolved_params: dict = Field(..., description="Task params with {{task:...}} refs resolved from completed task outputs")
+    depends_on: List[str] = Field(default_factory=list, description="Dependency task IDs")
+    execution_level: int = Field(0, description="0-indexed parallel execution level")
+    require_hitl: bool = Field(False, description="Whether this task requires HITL approval before execution")
 
 
 class PlanExecuteResponse(BaseModel):
-    """Response from plan execution."""
-    plan_id: str = Field(..., description="Canonical plan ID that was executed")
-    status: str = Field(..., description="Final plan status (completed|failed|cancelled)")
+    """Response from plan readiness evaluation."""
+    plan_id: str = Field(..., description="Canonical plan ID")
+    status: str = Field(..., description="Current plan status (pending|running|completed|failed|cancelled)")
+    ready_tasks: List[PlanReadyTask] = Field(default_factory=list, description="Tasks currently ready to run")
+    tasks_total: int
+    tasks_pending: int
+    tasks_running: int
     tasks_completed: int
     tasks_failed: int
     tasks_skipped: int
-    duration_ms: int
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+
+
+class PlanTaskUpdateRequest(BaseModel):
+    """Request to update one task status after external execution."""
+    plan_id: str = Field(..., description="Plan reference. Prefer the plan_id returned by plan_create; unique plan names are also accepted.")
+    task_id: str = Field(..., description="Task ID within the plan")
+    status: str = Field(..., description="New status (running|completed|failed|skipped)")
+    output: Optional[dict] = Field(None, description="Tool output for completed tasks")
+    error: Optional[str] = Field(None, description="Error message for failed tasks")
+
+
+class PlanTaskUpdateResponse(BaseModel):
+    """Response from task status update."""
+    plan_id: str
+    task_id: str
+    task_status: str
+    plan_status: str
+    tasks_total: int
+    tasks_pending: int
+    tasks_running: int
+    tasks_completed: int
+    tasks_failed: int
+    tasks_skipped: int
+    ready_tasks: List[PlanReadyTask] = Field(default_factory=list)
 
 
 class PlanListItem(BaseModel):

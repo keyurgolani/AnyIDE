@@ -9,6 +9,8 @@ from anyide.models import (
     PlanCreateResponse,
     PlanExecuteRequest,
     PlanExecuteResponse,
+    PlanTaskUpdateRequest,
+    PlanTaskUpdateResponse,
     PlanStatusRequest,
     PlanStatusResponse,
     PlanListResponse,
@@ -21,29 +23,38 @@ from anyide.modules.plan.tools import PlanTools
 
 _PLAN_CREATE_DESC = """Create a new multi-step plan with a DAG of tasks.
 
-Each task specifies a HostBridge tool to call (tool_category + tool_name + params).
+Each task specifies an AnyIDE tool to call (tool_category + tool_name + params).
 Tasks may depend on other tasks via `depends_on` (list of task IDs).
 Task params may contain `{{task:TASK_ID.field}}` references resolved at runtime.
 
 Validates the DAG at creation time using Kahn's algorithm (cycle detection, missing refs).
 Returns the execution order grouped by parallel level.
-The response includes `plan_id`; pass that value to `plan_execute`, `plan_status`, and `plan_cancel`.
+The response includes `plan_id`; pass that value to `plan_execute`, `plan_update_task`, `plan_status`, and `plan_cancel`.
 
 on_failure policies (plan-level default, overridable per-task):
 - **stop**: abort all remaining tasks when any task fails (default)
 - **skip_dependents**: skip only tasks that depend on the failed task
 - **continue**: continue all tasks regardless of failures"""
 
-_PLAN_EXECUTE_DESC = """Execute a plan synchronously, blocking until all tasks complete.
+_PLAN_EXECUTE_DESC = """Evaluate plan readiness and return runnable tasks.
 
 Input `plan_id` should be the `plan_id` returned by `plan_create`.
 For resilience, a unique plan name is also accepted; if multiple plans share that name, execution fails with an ambiguity error.
 
-Tasks at the same dependency level run **concurrently** via asyncio.gather.
-Task outputs are stored and can be referenced in downstream params via `{{task:ID.field}}`.
-Tasks with `require_hitl: true` block for human approval before executing.
+This endpoint does not execute tools. It marks a pending plan as running (first call),
+computes current `ready_tasks`, and resolves task refs in params using outputs from
+already completed tasks.
 
-Returns the final plan status and per-task counts."""
+Use `plan_update_task` after your orchestrator executes each task."""
+
+_PLAN_UPDATE_TASK_DESC = """Update one task status after external execution.
+
+Use this endpoint after your orchestrator runs a ready task:
+- set status to `running` when execution starts
+- set status to `completed` with `output` when execution succeeds
+- set status to `failed` with `error` when execution fails
+
+Failure policies (`stop`, `skip_dependents`, `continue`) are enforced here."""
 
 _PLAN_STATUS_DESC = """Get current status of a plan and all its tasks.
 
@@ -79,7 +90,7 @@ class PlanModule(ToolModule):
 
     @property
     def description(self) -> str:
-        return "DAG-based multi-step plan execution for AnyIDE"
+        return "DAG-based multi-step plan tracking for AnyIDE"
 
     def __init__(self, context):
         super().__init__(context)
@@ -121,7 +132,7 @@ class PlanModule(ToolModule):
         @app.post(
             "/api/tools/plan/execute",
             operation_id="plan_execute",
-            summary="Execute Plan",
+            summary="Get Ready Tasks",
             description=_PLAN_EXECUTE_DESC,
             response_model=PlanExecuteResponse,
             tags=["plan"],
@@ -137,7 +148,7 @@ class PlanModule(ToolModule):
         @sub_app.post(
             "/execute",
             operation_id="plan_execute",
-            summary="Execute Plan",
+            summary="Get Ready Tasks",
             description=_PLAN_EXECUTE_DESC,
             response_model=PlanExecuteResponse,
             tags=["plan"],
@@ -148,6 +159,38 @@ class PlanModule(ToolModule):
                 "execute",
                 request.model_dump(),
                 lambda: self.plan_tools.execute(request),
+            )
+
+        @app.post(
+            "/api/tools/plan/update_task",
+            operation_id="plan_update_task",
+            summary="Update Task Status",
+            description=_PLAN_UPDATE_TASK_DESC,
+            response_model=PlanTaskUpdateResponse,
+            tags=["plan"],
+        )
+        async def plan_update_task_root(request: PlanTaskUpdateRequest) -> PlanTaskUpdateResponse:
+            return await self.context.execute_tool(
+                "plan",
+                "update_task",
+                request.model_dump(),
+                lambda: self.plan_tools.update_task(request),
+            )
+
+        @sub_app.post(
+            "/update_task",
+            operation_id="plan_update_task",
+            summary="Update Task Status",
+            description=_PLAN_UPDATE_TASK_DESC,
+            response_model=PlanTaskUpdateResponse,
+            tags=["plan"],
+        )
+        async def plan_update_task_sub(request: PlanTaskUpdateRequest) -> PlanTaskUpdateResponse:
+            return await self.context.execute_tool(
+                "plan",
+                "update_task",
+                request.model_dump(),
+                lambda: self.plan_tools.update_task(request),
             )
 
         @app.post(

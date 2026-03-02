@@ -32,7 +32,10 @@ export class LogsWebSocketClient {
       this.isConnecting = true
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
       const host = window.location.host
-      const wsUrl = `${protocol}//${host}/ws/logs`
+      const pathname = window.location.pathname || '/'
+      const adminIndex = pathname.indexOf('/admin')
+      const prefix = adminIndex > 0 ? pathname.slice(0, adminIndex) : ''
+      const wsUrl = `${protocol}//${host}${prefix}/ws/logs`
 
       this.ws = new WebSocket(wsUrl)
 

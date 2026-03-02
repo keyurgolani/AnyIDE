@@ -78,7 +78,7 @@ curl http://localhost:8080/health
 
 ```
 URL: http://localhost:8080/admin/
-Default Password: admin
+Default Password: admin (preferred env override: ANYIDE_ADMIN_PASSWORD; legacy: ADMIN_PASSWORD)
 ```
 
 ### Test Your First Tool Call
@@ -157,7 +157,7 @@ The admin dashboard provides human oversight, HITL management, and system monito
 
 ```
 URL: http://localhost:8080/admin/
-Default Password: admin (change via ADMIN_PASSWORD env var)
+Default Password: admin (preferred env override: ANYIDE_ADMIN_PASSWORD; legacy: ADMIN_PASSWORD)
 ```
 
 ### Dashboard Features

@@ -7,7 +7,8 @@ This document provides sample requests you can give to an LLM that has access to
 Before trying commands, you can monitor and approve operations through the admin dashboard:
 
 **Access:** http://localhost:8080/admin/  
-**Default Password:** `admin`
+**Default Password:** `admin`  
+**Password precedence:** `ANYIDE_ADMIN_PASSWORD` > `ADMIN_PASSWORD` (legacy) > `config.yaml auth.admin_password` > default `admin`
 
 The dashboard provides a unified widget-based interface:
 - **HITL Approval Queue Widget:** See pending requests, approve/reject directly from dashboard
@@ -698,14 +699,15 @@ As of this version, AnyIDE supports:
   - `plan_create` - Create a plan with DAG validation
     - Validates task dependencies, detects cycles via Kahn's algorithm
     - Returns plan_id, execution order, task count
-  - `plan_execute` - Execute a plan synchronously
+  - `plan_execute` - Evaluate readiness and return runnable tasks
     - Prefer `plan_id` from `plan_create` response
     - Unique plan names are accepted as fallback; ambiguous names are rejected
-    - Topological sort ensures correct dependency order
-    - Concurrent execution via asyncio.gather for same-level tasks
-    - Task reference resolution: `{{task:TASK_ID.field}}`
-    - Failure policies: stop, skip_dependents, continue
-    - HITL integration for tasks with require_hitl=True
+    - Marks plan `pending -> running` on first call
+    - Returns `ready_tasks` with `resolved_params` and dependency metadata
+  - `plan_update_task` - Update one task after external execution
+    - Set `running`, `completed` (with `output`), `failed` (with `error`), or `skipped`
+    - Enforces failure policies (`stop`, `skip_dependents`, `continue`)
+    - Returns updated counts and the next `ready_tasks` set
   - `plan_status` - Get plan and per-task status
     - Task states: pending, running, completed, failed, skipped
     - Includes outputs, errors, timestamps
@@ -752,8 +754,9 @@ When using MCP clients (Claude Desktop, Cursor, etc.), tools are identified by t
 - `memory_related` - Get all connected nodes
 - `memory_subtree` - Get full descendant subtree
 - `memory_stats` - Knowledge graph metrics
-- `plan_create` - Create a DAG-based execution plan
-- `plan_execute` - Execute a plan synchronously
+- `plan_create` - Create a DAG-based orchestration plan
+- `plan_execute` - Get current ready tasks
+- `plan_update_task` - Update task status after external execution
 - `plan_status` - Get plan and task status
 - `plan_list` - List all plans
 - `plan_cancel` - Cancel a plan
@@ -799,18 +802,22 @@ When using REST API directly:
 - `POST /api/tools/memory/related` - Get all connected nodes
 - `POST /api/tools/memory/subtree` - Get full descendant subtree
 - `POST /api/tools/memory/stats` - Knowledge graph metrics
-- `POST /api/tools/plan/create` - Create a DAG-based execution plan
-- `POST /api/tools/plan/execute` - Execute a plan synchronously
+- `POST /api/tools/plan/create` - Create a DAG-based orchestration plan
+- `POST /api/tools/plan/execute` - Return current ready tasks
+- `POST /api/tools/plan/update_task` - Update one task status
 - `POST /api/tools/plan/status` - Get plan and task status
 - `POST /api/tools/plan/list` - List all plans
 - `POST /api/tools/plan/cancel` - Cancel a plan
 
 ### Admin API Endpoints
 
+- `POST /admin/api/login` - Create admin session (returns token + cookie)
+- `GET /admin/api/health` - System health (admin auth required)
 - `GET /admin/api/secrets` - List loaded secret key names (admin auth required)
 - `POST /admin/api/secrets/reload` - Reload secrets from file (admin auth required)
+- Protected admin endpoints accept session cookie or `Authorization: Bearer <token>`
 
-## Plan Tools (DAG Execution)
+## Plan Tools (DAG Orchestration)
 
 ### Creating Plans
 
@@ -828,14 +835,18 @@ When using REST API directly:
 ### Executing Plans
 
 **"Execute the plan I just created"**
-- Runs all tasks in topological order
+- Returns the tasks that are currently ready to run
 - Prefer passing `plan_id` returned by `plan_create`
 - Unique plan names are accepted only when exactly one plan matches
-- Tasks at same level execute concurrently
-- Returns final status, completed/failed/skipped counts, duration
+- Returns `ready_tasks`, plan status, and task counters
 
-**"Run the plan with a 5-minute timeout"**
-- Executes plan with custom timeout (default 1 hour)
+**"After I run a task, mark it completed and get next ready tasks"**
+- Call `plan_update_task` with `status: "completed"` and `output`
+- Response includes updated counts and newly ready downstream tasks
+
+**"Mark a task as failed and apply failure policy"**
+- Call `plan_update_task` with `status: "failed"` and `error`
+- Server applies `stop`, `skip_dependents`, or `continue` automatically
 
 ### Plan Status and Management
 
@@ -871,10 +882,10 @@ When using REST API directly:
 
 ### HITL in Plans
 
-**"Create a plan where the git_push task requires approval"**
-- Set `require_hitl: true` on the task
-- Plan pauses at that task until approved
-- Other tasks in same level run concurrently
+**"Create a plan where `git_push` is HITL-tagged for my orchestrator"**
+- Set `require_hitl: true` on the task definition
+- `plan_execute` exposes that flag in each `ready_task`
+- External orchestrator decides how to enforce approval
 
 ### Curl Examples
 
@@ -890,15 +901,25 @@ curl -X POST http://localhost:8080/api/tools/plan/create \
     ]
   }'
 
-# Execute a plan
+# Get ready tasks for a plan
 curl -X POST http://localhost:8080/api/tools/plan/execute \
   -H "Content-Type: application/json" \
   -d '{"plan_id": "<plan-id>"}'
 
-# Execute by unique plan name (fallback when unambiguous)
-curl -X POST http://localhost:8080/api/tools/plan/execute \
+# Mark task as running
+curl -X POST http://localhost:8080/api/tools/plan/update_task \
   -H "Content-Type: application/json" \
-  -d '{"plan_id": "write-then-read"}'
+  -d '{"plan_id": "<plan-id>", "task_id": "write", "status": "running"}'
+
+# Mark task as completed and retrieve next ready tasks
+curl -X POST http://localhost:8080/api/tools/plan/update_task \
+  -H "Content-Type: application/json" \
+  -d '{"plan_id": "<plan-id>", "task_id": "write", "status": "completed", "output": {"ok": true}}'
+
+# Mark task as failed
+curl -X POST http://localhost:8080/api/tools/plan/update_task \
+  -H "Content-Type: application/json" \
+  -d '{"plan_id": "<plan-id>", "task_id": "write", "status": "failed", "error": "write failed"}'
 
 # Check plan status
 curl -X POST http://localhost:8080/api/tools/plan/status \

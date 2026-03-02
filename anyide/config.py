@@ -95,21 +95,54 @@ class Config(BaseModel):
     modules: ModulesConfig = Field(default_factory=ModulesConfig)
 
 
+def get_admin_password_override() -> tuple[Optional[str], Optional[str]]:
+    """Return the first non-empty admin password env override and its source key.
+
+    Precedence:
+    1. ANYIDE_ADMIN_PASSWORD
+    2. ADMIN_PASSWORD (legacy)
+    """
+    for env_key in ("ANYIDE_ADMIN_PASSWORD", "ADMIN_PASSWORD"):
+        value = os.getenv(env_key)
+        if value is None:
+            continue
+        # Treat empty/whitespace-only values as unset to avoid accidental lockout.
+        if value.strip() == "":
+            continue
+        return value, env_key
+    return None, None
+
+
+def get_admin_password_source(config: Config) -> str:
+    """Return effective admin password source label for safe observability."""
+    _, source_key = get_admin_password_override()
+    if source_key:
+        return f"env:{source_key.lower()}"
+    # Config includes both file-provided and default model value fallback.
+    return "config"
+
+
 def load_config(config_path: str = "config.yaml") -> Config:
     """Load configuration from YAML file with environment variable substitution."""
     config_file = Path(config_path)
     
     if not config_file.exists():
-        # Return default config
-        return Config()
-    
-    with open(config_file, "r") as f:
-        config_data = yaml.safe_load(f)
-    
-    # Substitute environment variables
-    config_data = _substitute_env_vars(config_data)
-    
-    return Config(**config_data)
+        config = Config()
+    else:
+        with open(config_file, "r") as f:
+            config_data = yaml.safe_load(f)
+        
+        # Substitute environment variables
+        config_data = _substitute_env_vars(config_data)
+        
+        config = Config(**config_data)
+
+    # Apply explicit admin password env override precedence.
+    env_admin_password, _ = get_admin_password_override()
+    if env_admin_password is not None:
+        config.auth.admin_password = env_admin_password
+
+    return config
 
 
 def _substitute_env_vars(data: Any) -> Any:

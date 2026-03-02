@@ -463,9 +463,47 @@ class TestAuthenticationFlow:
 
         assert response.status_code == 401
 
+    async def test_login_uses_anyide_admin_password_env_override(self, client, monkeypatch):
+        """ANYIDE_ADMIN_PASSWORD should override config and legacy defaults."""
+        monkeypatch.setenv("ANYIDE_ADMIN_PASSWORD", "env-secret-123")
+        monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
+
+        from anyide import main as main_module
+        from anyide.config import load_config
+
+        monkeypatch.setattr(main_module, "config", load_config())
+
+        wrong = await client.post(
+            "/admin/api/login",
+            json={"password": "admin"},
+        )
+        correct = await client.post(
+            "/admin/api/login",
+            json={"password": "env-secret-123"},
+        )
+
+        assert wrong.status_code == 401
+        assert correct.status_code == 200
+        assert "session_token" in correct.cookies
+
     async def test_logout(self, client, auth_headers):
         """Test logout."""
         response = await client.post("/admin/api/logout", cookies=auth_headers)
+        assert response.status_code == 200
+
+    async def test_protected_endpoint_accepts_bearer_token(self, client):
+        """Protected admin endpoints should accept Bearer token auth fallback."""
+        login_response = await client.post(
+            "/admin/api/login",
+            json={"password": "admin"},
+        )
+        assert login_response.status_code == 200
+        token = login_response.json()["token"]
+
+        response = await client.get(
+            "/admin/api/health",
+            headers={"Authorization": f"Bearer {token}"},
+        )
         assert response.status_code == 200
 
     async def test_access_protected_endpoint_after_logout(self, client, auth_headers):

@@ -1,11 +1,9 @@
-"""Plan tools — DAG-based multi-step plan creation and execution."""
+"""Plan tools — DAG-based multi-step planning and status tracking."""
 
 import asyncio
 import json
 import re
-import time
 import uuid
-from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Set
 
@@ -16,8 +14,11 @@ from anyide.models import (
     PlanCreateResponse,
     PlanExecuteRequest,
     PlanExecuteResponse,
+    PlanReadyTask,
     PlanStatusRequest,
     PlanStatusResponse,
+    PlanTaskUpdateRequest,
+    PlanTaskUpdateResponse,
     PlanTaskStatus,
     PlanListItem,
     PlanListResponse,
@@ -164,16 +165,15 @@ def _resolve_task_refs(params: Dict, task_outputs: Dict[str, Dict]) -> Dict:
 
 
 class PlanTools:
-    """DAG-based plan creation and execution tools."""
+    """DAG-based plan creation and external-orchestrator status tools."""
 
     def __init__(self, db: Database, hitl_manager: Any, tool_dispatch: Callable):
         """Initialize plan tools.
 
         Args:
             db: Connected Database instance.
-            hitl_manager: HITLManager for task-level HITL gates.
-            tool_dispatch: Async callable ``(category, name, params) -> dict``
-                           that executes a tool and returns its output as a dict.
+            hitl_manager: Reserved for compatibility with module context wiring.
+            tool_dispatch: Reserved for compatibility with module context wiring.
         """
         self.db = db
         self.hitl_manager = hitl_manager
@@ -326,15 +326,7 @@ class PlanTools:
     # ------------------------------------------------------------------
 
     async def execute(self, req: PlanExecuteRequest) -> PlanExecuteResponse:
-        """Execute a plan synchronously, blocking until all tasks complete.
-
-        Tasks within the same dependency level execute concurrently via
-        asyncio.gather. Failure handling respects the plan's on_failure policy.
-
-        Raises:
-            PlanNotFoundError: If the plan does not exist.
-            ValueError: If the plan is already running, completed, or cancelled.
-        """
+        """Evaluate plan state and return tasks that are currently ready to run."""
         conn = self.db.connection
 
         plan = await self._resolve_plan_reference(
@@ -342,257 +334,348 @@ class PlanTools:
         )
         plan_id = plan["id"]
 
-        if plan["status"] == "running":
-            raise ValueError(f"Plan '{plan_id}' is already running")
-        if plan["status"] in ("completed", "failed"):
-            raise ValueError(
-                f"Plan '{plan_id}' already finished with status '{plan['status']}'. "
-                "Create a new plan to re-run."
-            )
-        if plan["status"] == "cancelled":
-            raise ValueError(f"Plan '{plan_id}' is cancelled and cannot be executed")
-
-        # Load all tasks ordered by level
-        cur = await conn.execute(
-            "SELECT * FROM plan_tasks WHERE plan_id = ? ORDER BY execution_level, id",
-            (plan_id,),
-        )
-        all_task_rows = await cur.fetchall()
-        all_tasks = [dict(r) for r in all_task_rows]
-
-        # Group by execution level
-        levels: Dict[int, List[Dict]] = defaultdict(list)
-        for task in all_tasks:
-            levels[task["execution_level"]].append(task)
-
-        now = _now_iso()
-        await conn.execute(
-            "UPDATE plan_plans SET status = 'running', started_at = ? WHERE id = ?",
-            (now, plan_id),
-        )
-        await conn.commit()
-
-        start_ms = int(time.time() * 1000)
-        task_outputs: Dict[str, Dict] = {}
-        failed_task_ids: Set[str] = set()  # all failed tasks (for counting)
-        skip_ids: Set[str] = set()          # tasks whose dependents must be skipped
-        stop_all = False                    # True when a stop-policy task has failed
-
-        # Build a quick id→task map for policy lookups
-        task_by_id: Dict[str, Dict] = {t["id"]: t for t in all_tasks}
-
-        try:
-            for level_idx in sorted(levels.keys()):
-                # Check for external cancellation
-                cur = await conn.execute(
-                    "SELECT status FROM plan_plans WHERE id = ?", (plan_id,)
-                )
-                plan_row = await cur.fetchone()
-                if plan_row and plan_row["status"] == "cancelled":
-                    break
-
-                level_tasks = levels[level_idx]
-                tasks_to_run: List[Dict] = []
-                tasks_to_skip: List[Dict] = []
-
-                for task in level_tasks:
-                    deps = _parse_json_field(task["depends_on"], [])
-                    is_blocked = (
-                        stop_all
-                        or task["id"] in skip_ids
-                        or any(d in skip_ids for d in deps)
-                    )
-                    if is_blocked:
-                        tasks_to_skip.append(task)
-                    else:
-                        tasks_to_run.append(task)
-
-                # Mark skipped tasks
-                skip_now = _now_iso()
-                for task in tasks_to_skip:
-                    await conn.execute(
-                        """UPDATE plan_tasks SET status = 'skipped', completed_at = ?
-                           WHERE id = ? AND plan_id = ?""",
-                        (skip_now, task["id"], plan_id),
-                    )
-                if tasks_to_skip:
-                    await conn.commit()
-
-                if not tasks_to_run:
-                    continue
-
-                # Execute all tasks at this level concurrently
-                coroutines = [
-                    self._execute_task(plan_id, task, task_outputs, plan)
-                    for task in tasks_to_run
-                ]
-                results = await asyncio.gather(*coroutines, return_exceptions=True)
-
-                for task, result in zip(tasks_to_run, results):
-                    if isinstance(result, Exception):
-                        task_id = task["id"]
-                        failed_task_ids.add(task_id)
-                        # Determine effective policy for THIS failing task
-                        effective_policy = task["on_failure"] or plan["on_failure"]
-                        if effective_policy == "stop":
-                            stop_all = True
-                            skip_ids.add(task_id)
-                        elif effective_policy == "skip_dependents":
-                            transitive = _get_transitive_dependents(task_id, all_tasks)
-                            skip_ids.update(transitive)
-                        # "continue": don't block anything
-                    else:
-                        task_id, output = result
-                        task_outputs[task_id] = output
-
-        except asyncio.CancelledError:
+        if plan["status"] == "pending":
+            now = _now_iso()
             await conn.execute(
-                "UPDATE plan_plans SET status = 'cancelled', completed_at = ? WHERE id = ?",
-                (_now_iso(), plan_id),
+                """UPDATE plan_plans
+                   SET status = 'running', started_at = COALESCE(started_at, ?)
+                   WHERE id = ?""",
+                (now, plan_id),
             )
             await conn.commit()
-            raise
+            plan["status"] = "running"
+            plan["started_at"] = plan.get("started_at") or now
 
-        # Tally final counts from DB
-        cur = await conn.execute(
-            "SELECT status, COUNT(*) as cnt FROM plan_tasks WHERE plan_id = ? GROUP BY status",
-            (plan_id,),
-        )
-        status_counts: Dict[str, int] = {r["status"]: r["cnt"] for r in await cur.fetchall()}
+        plan, task_rows = await self._sync_plan_status(conn, plan_id)
+        ready_tasks = self._build_ready_tasks(plan, task_rows)
+        counts = self._compute_status_counts(task_rows)
 
-        tasks_completed = status_counts.get("completed", 0)
-        tasks_failed = status_counts.get("failed", 0)
-        tasks_skipped = status_counts.get("skipped", 0)
-
-        # Check if plan was cancelled externally during execution
-        cur = await conn.execute(
-            "SELECT status FROM plan_plans WHERE id = ?", (plan_id,)
-        )
-        current_plan_status = (await cur.fetchone())["status"]
-
-        if current_plan_status != "cancelled":
-            final_status = "completed" if tasks_failed == 0 else "failed"
-            await conn.execute(
-                "UPDATE plan_plans SET status = ?, completed_at = ? WHERE id = ?",
-                (final_status, _now_iso(), plan_id),
-            )
-            await conn.commit()
-        else:
-            final_status = "cancelled"
-
-        duration_ms = int(time.time() * 1000) - start_ms
         logger.info(
-            "plan_execute",
+            "plan_execute_ready_snapshot",
             plan_id=plan_id,
-            status=final_status,
-            completed=tasks_completed,
-            failed=tasks_failed,
-            skipped=tasks_skipped,
-            duration_ms=duration_ms,
+            status=plan["status"],
+            ready_tasks=len(ready_tasks),
+            pending=counts["pending"],
+            running=counts["running"],
+            completed=counts["completed"],
+            failed=counts["failed"],
+            skipped=counts["skipped"],
         )
 
         return PlanExecuteResponse(
             plan_id=plan_id,
-            status=final_status,
-            tasks_completed=tasks_completed,
-            tasks_failed=tasks_failed,
-            tasks_skipped=tasks_skipped,
-            duration_ms=duration_ms,
+            status=plan["status"],
+            ready_tasks=ready_tasks,
+            tasks_total=len(task_rows),
+            tasks_pending=counts["pending"],
+            tasks_running=counts["running"],
+            tasks_completed=counts["completed"],
+            tasks_failed=counts["failed"],
+            tasks_skipped=counts["skipped"],
+            started_at=plan.get("started_at"),
+            completed_at=plan.get("completed_at"),
         )
 
-    async def _execute_task(
-        self,
-        plan_id: str,
-        task: Dict,
-        task_outputs: Dict[str, Dict],
-        plan: Dict,
-    ) -> tuple:
-        """Execute a single plan task. Returns ``(task_id, output_dict)`` on success."""
+    # ------------------------------------------------------------------
+    # plan_update_task
+    # ------------------------------------------------------------------
+
+    async def update_task(self, req: PlanTaskUpdateRequest) -> PlanTaskUpdateResponse:
+        """Update a single task status after external task execution."""
         conn = self.db.connection
-        task_id = task["id"]
+        plan = await self._resolve_plan_reference(
+            conn, req.plan_id, operation="update_task"
+        )
+        plan_id = plan["id"]
 
-        # Resolve {{task:ID.field}} references
-        raw_params = _parse_json_field(task["params"], {})
-        try:
-            resolved_params = _resolve_task_refs(raw_params, task_outputs)
-        except Exception as e:
-            error_msg = f"Failed to resolve task references: {e}"
-            await self._update_task(conn, plan_id, task_id, "failed", error=error_msg)
-            raise ValueError(error_msg) from e
+        if plan["status"] == "cancelled":
+            raise ValueError(f"Plan '{plan_id}' is cancelled and cannot be updated")
 
-        # HITL gate for tasks that require approval
-        if task.get("require_hitl"):
-            try:
-                hitl_req = await self.hitl_manager.create_request(
-                    tool_name=task["tool_name"],
-                    tool_category=task["tool_category"],
-                    request_params=resolved_params,
-                    request_context={"plan_id": plan_id, "task_id": task_id},
-                    policy_rule_matched="plan_task_require_hitl",
-                )
-                decision = await self.hitl_manager.wait_for_decision(hitl_req.id)
-                if decision == "rejected":
-                    error_msg = "Task rejected via HITL"
-                    await self._update_task(conn, plan_id, task_id, "failed", error=error_msg)
-                    raise ValueError(error_msg)
-                elif decision == "expired":
-                    error_msg = "HITL approval timed out"
-                    await self._update_task(conn, plan_id, task_id, "failed", error=error_msg)
-                    raise ValueError(error_msg)
-            except (ValueError, TimeoutError):
-                raise
-            except Exception as e:
-                error_msg = f"HITL error: {e}"
-                await self._update_task(conn, plan_id, task_id, "failed", error=error_msg)
-                raise ValueError(error_msg) from e
-
-        # Mark as running
-        await self._update_task(conn, plan_id, task_id, "running")
-
-        try:
-            output = await self.tool_dispatch(
-                task["tool_category"], task["tool_name"], resolved_params
+        valid_statuses = {"running", "completed", "failed", "skipped"}
+        if req.status not in valid_statuses:
+            raise ValueError(
+                f"Invalid task status '{req.status}'. Must be one of: {sorted(valid_statuses)}"
             )
-            output_dict: Dict = output if isinstance(output, dict) else {"result": str(output)}
-            await self._update_task(conn, plan_id, task_id, "completed", output=output_dict)
-            return task_id, output_dict
 
-        except Exception as e:
-            await self._update_task(conn, plan_id, task_id, "failed", error=str(e))
-            raise
+        cur = await conn.execute(
+            "SELECT * FROM plan_tasks WHERE plan_id = ? AND id = ?",
+            (plan_id, req.task_id),
+        )
+        task_row = await cur.fetchone()
+        if task_row is None:
+            raise PlanNotFoundError(
+                f"Task '{req.task_id}' not found in plan '{plan_id}'."
+            )
 
-    async def _update_task(
-        self,
-        conn,
-        plan_id: str,
-        task_id: str,
-        status: str,
-        output: Optional[Dict] = None,
-        error: Optional[str] = None,
-    ) -> None:
-        """Persist a task status change to the database."""
+        task = dict(task_row)
+        if task["status"] in ("completed", "failed", "skipped"):
+            raise ValueError(
+                f"Task '{req.task_id}' is already in terminal status '{task['status']}'"
+            )
+
+        all_task_rows = await self._get_plan_tasks(conn, plan_id)
+        task_map = {t["id"]: t for t in all_task_rows}
+        ready_before_update = self._is_task_ready(task, task_map, plan)
+
+        if req.status == "running" and not ready_before_update:
+            raise ValueError(f"Task '{req.task_id}' is not ready; dependencies are incomplete")
+
+        if req.status in ("completed", "failed") and task["status"] == "pending" and not ready_before_update:
+            raise ValueError(f"Task '{req.task_id}' is not ready; dependencies are incomplete")
+
         now = _now_iso()
-        if status == "running":
+        if req.status == "running":
             await conn.execute(
-                """UPDATE plan_tasks SET status = 'running', started_at = ?
-                   WHERE id = ? AND plan_id = ?""",
-                (now, task_id, plan_id),
+                """UPDATE plan_tasks
+                   SET status = 'running', started_at = COALESCE(started_at, ?)
+                   WHERE plan_id = ? AND id = ?""",
+                (now, plan_id, req.task_id),
             )
         else:
             await conn.execute(
                 """UPDATE plan_tasks
-                   SET status = ?, output = ?, error = ?, completed_at = ?
-                   WHERE id = ? AND plan_id = ?""",
+                   SET status = ?, output = ?, error = ?,
+                       started_at = COALESCE(started_at, ?), completed_at = ?
+                   WHERE plan_id = ? AND id = ?""",
                 (
-                    status,
-                    json.dumps(output) if output is not None else None,
-                    error,
+                    req.status,
+                    json.dumps(req.output) if req.output is not None else None,
+                    req.error,
                     now,
-                    task_id,
+                    now,
                     plan_id,
+                    req.task_id,
                 ),
             )
+
+        if plan["status"] == "pending":
+            await conn.execute(
+                """UPDATE plan_plans
+                   SET status = 'running', started_at = COALESCE(started_at, ?)
+                   WHERE id = ?""",
+                (now, plan_id),
+            )
+
+        if req.status == "failed":
+            await self._apply_failure_policy(conn, plan, req.task_id)
+
         await conn.commit()
+
+        plan, task_rows = await self._sync_plan_status(conn, plan_id)
+        counts = self._compute_status_counts(task_rows)
+        ready_tasks = self._build_ready_tasks(plan, task_rows)
+
+        logger.info(
+            "plan_update_task",
+            plan_id=plan_id,
+            task_id=req.task_id,
+            task_status=req.status,
+            plan_status=plan["status"],
+            pending=counts["pending"],
+            running=counts["running"],
+            completed=counts["completed"],
+            failed=counts["failed"],
+            skipped=counts["skipped"],
+        )
+
+        return PlanTaskUpdateResponse(
+            plan_id=plan_id,
+            task_id=req.task_id,
+            task_status=req.status,
+            plan_status=plan["status"],
+            tasks_total=len(task_rows),
+            tasks_pending=counts["pending"],
+            tasks_running=counts["running"],
+            tasks_completed=counts["completed"],
+            tasks_failed=counts["failed"],
+            tasks_skipped=counts["skipped"],
+            ready_tasks=ready_tasks,
+        )
+
+    async def _apply_failure_policy(self, conn, plan: Dict[str, Any], failed_task_id: str) -> None:
+        """Apply effective on-failure policy after a task is marked failed."""
+        plan_id = plan["id"]
+        all_tasks = await self._get_plan_tasks(conn, plan_id)
+        task_map = {t["id"]: t for t in all_tasks}
+        failed_task = task_map.get(failed_task_id)
+        if failed_task is None:
+            return
+
+        policy = self._effective_failure_policy(failed_task, plan)
+        if policy == "continue":
+            return
+
+        skip_now = _now_iso()
+        if policy == "stop":
+            await conn.execute(
+                """UPDATE plan_tasks
+                   SET status = 'skipped',
+                       started_at = COALESCE(started_at, ?),
+                       completed_at = ?
+                   WHERE plan_id = ? AND id != ?
+                     AND status IN ('pending', 'running')""",
+                (skip_now, skip_now, plan_id, failed_task_id),
+            )
+            return
+
+        # skip_dependents
+        dependents = sorted(_get_transitive_dependents(failed_task_id, all_tasks))
+        if not dependents:
+            return
+        placeholders = ", ".join("?" for _ in dependents)
+        await conn.execute(
+            f"""UPDATE plan_tasks
+                SET status = 'skipped',
+                    started_at = COALESCE(started_at, ?),
+                    completed_at = ?
+                WHERE plan_id = ?
+                  AND id IN ({placeholders})
+                  AND status IN ('pending', 'running')""",
+            (skip_now, skip_now, plan_id, *dependents),
+        )
+
+    async def _get_plan_tasks(self, conn, plan_id: str) -> List[Dict[str, Any]]:
+        """Load all tasks for a plan ordered deterministically for readiness checks."""
+        cur = await conn.execute(
+            "SELECT * FROM plan_tasks WHERE plan_id = ? ORDER BY execution_level, id",
+            (plan_id,),
+        )
+        rows = await cur.fetchall()
+        return [dict(row) for row in rows]
+
+    def _compute_status_counts(self, task_rows: List[Dict[str, Any]]) -> Dict[str, int]:
+        """Return per-status counts for plan tasks."""
+        counts = {
+            "pending": 0,
+            "running": 0,
+            "completed": 0,
+            "failed": 0,
+            "skipped": 0,
+        }
+        for row in task_rows:
+            status = row["status"]
+            if status in counts:
+                counts[status] += 1
+        return counts
+
+    def _effective_failure_policy(self, task: Dict[str, Any], plan: Dict[str, Any]) -> str:
+        """Resolve task-level failure policy with plan-level fallback."""
+        return task.get("on_failure") or plan["on_failure"]
+
+    def _dependency_satisfied(self, dep_task: Dict[str, Any], plan: Dict[str, Any]) -> bool:
+        """Whether a dependency task is satisfied for downstream readiness."""
+        dep_status = dep_task["status"]
+        if dep_status == "completed":
+            return True
+        if dep_status == "failed":
+            return self._effective_failure_policy(dep_task, plan) == "continue"
+        return False
+
+    def _is_task_ready(
+        self,
+        task: Dict[str, Any],
+        task_map: Dict[str, Dict[str, Any]],
+        plan: Dict[str, Any],
+    ) -> bool:
+        """Check whether a pending task has all dependencies satisfied."""
+        if task["status"] != "pending":
+            return False
+        for dep_id in _parse_json_field(task["depends_on"], []):
+            dep_task = task_map.get(dep_id)
+            if dep_task is None or not self._dependency_satisfied(dep_task, plan):
+                return False
+        return True
+
+    def _build_ready_tasks(
+        self,
+        plan: Dict[str, Any],
+        task_rows: List[Dict[str, Any]],
+    ) -> List[PlanReadyTask]:
+        """Build the current ready task list with params resolved from completed outputs."""
+        task_map = {t["id"]: t for t in task_rows}
+        outputs = {
+            t["id"]: _parse_json_field(t.get("output"), {}) or {}
+            for t in task_rows
+            if t["status"] == "completed"
+        }
+
+        ready_tasks: List[PlanReadyTask] = []
+        for task in task_rows:
+            if not self._is_task_ready(task, task_map, plan):
+                continue
+            raw_params = _parse_json_field(task.get("params"), {}) or {}
+            resolved_params = _resolve_task_refs(raw_params, outputs)
+            ready_tasks.append(
+                PlanReadyTask(
+                    id=task["id"],
+                    name=task["name"],
+                    tool_category=task["tool_category"],
+                    tool_name=task["tool_name"],
+                    resolved_params=resolved_params,
+                    depends_on=_parse_json_field(task["depends_on"], []),
+                    execution_level=task["execution_level"],
+                    require_hitl=bool(task.get("require_hitl")),
+                )
+            )
+        return ready_tasks
+
+    def _derive_plan_status(self, plan: Dict[str, Any], counts: Dict[str, int]) -> str:
+        """Derive canonical plan status from plan row + task counts."""
+        if plan["status"] == "cancelled":
+            return "cancelled"
+
+        if counts["running"] > 0:
+            return "running"
+
+        if counts["pending"] == 0:
+            return "failed" if counts["failed"] > 0 else "completed"
+
+        return "pending" if plan["status"] == "pending" else "running"
+
+    async def _sync_plan_status(self, conn, plan_id: str) -> tuple[Dict[str, Any], List[Dict[str, Any]]]:
+        """Recompute and persist plan status from current task states."""
+        cur = await conn.execute("SELECT * FROM plan_plans WHERE id = ?", (plan_id,))
+        row = await cur.fetchone()
+        if row is None:
+            raise PlanNotFoundError(
+                f"Plan '{plan_id}' not found. Pass the plan_id returned by plan_create."
+            )
+        plan = dict(row)
+        task_rows = await self._get_plan_tasks(conn, plan_id)
+        counts = self._compute_status_counts(task_rows)
+        derived_status = self._derive_plan_status(plan, counts)
+
+        if plan["status"] == "cancelled":
+            return plan, task_rows
+
+        now = _now_iso()
+        started_at = plan["started_at"]
+        if derived_status != "pending" and not started_at:
+            started_at = now
+
+        if derived_status in ("completed", "failed"):
+            completed_at = plan["completed_at"] or now
+        else:
+            completed_at = None
+
+        needs_update = (
+            derived_status != plan["status"]
+            or started_at != plan["started_at"]
+            or completed_at != plan["completed_at"]
+        )
+        if needs_update:
+            await conn.execute(
+                """UPDATE plan_plans
+                   SET status = ?, started_at = ?, completed_at = ?
+                   WHERE id = ?""",
+                (derived_status, started_at, completed_at, plan_id),
+            )
+            await conn.commit()
+            plan["status"] = derived_status
+            plan["started_at"] = started_at
+            plan["completed_at"] = completed_at
+
+        return plan, task_rows
 
     # ------------------------------------------------------------------
     # plan_status

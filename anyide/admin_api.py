@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Response, Cookie, Depends
+from fastapi import APIRouter, HTTPException, Query, Response, Cookie, Depends, Header
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -115,18 +115,37 @@ class AuditLogFilterResponse(BaseModel):
 
 
 # Dependency to check authentication
-async def require_auth(session_token: Optional[str] = Cookie(None)):
+async def require_auth(
+    session_token: Optional[str] = Cookie(None),
+    authorization: Optional[str] = Header(None),
+    x_session_token: Optional[str] = Header(None),
+):
     """Require authentication."""
-    if not session_token or session_token not in active_sessions:
+    token = session_token
+
+    # Fallback to explicit headers when cookie is not available (e.g. strict browser policy).
+    if not token and x_session_token:
+        candidate = x_session_token.strip()
+        if candidate:
+            token = candidate
+
+    if not token and authorization:
+        value = authorization.strip()
+        if value.lower().startswith("bearer "):
+            candidate = value[7:].strip()
+            if candidate:
+                token = candidate
+
+    if not token or token not in active_sessions:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     # Check if session is expired (24 hours)
-    session_time = active_sessions[session_token]
+    session_time = active_sessions[token]
     if datetime.now(timezone.utc) - session_time > timedelta(hours=24):
-        del active_sessions[session_token]
+        del active_sessions[token]
         raise HTTPException(status_code=401, detail="Session expired")
     
-    return session_token
+    return token
 
 
 @router.post("/login", response_model=LoginResponse)

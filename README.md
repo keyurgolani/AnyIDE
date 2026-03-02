@@ -46,13 +46,17 @@ Built-in admin dashboard provides human oversight, HITL (Human-in-the-Loop) appr
 - **HITL System:** Real-time approval workflow for sensitive operations
 - **Admin Dashboard:** Premium UI with real-time updates
   - Automatic redirect to login when admin session expires
+  - Subpath-aware API and WebSocket routing (`/my-prefix/admin` deployments)
+  - Header-based auth fallback for restricted-cookie browser scenarios
+  - Resilient WebSocket message queueing during initial connect/reconnect
 - **Audit Logging:** Complete execution history
 - **Policy Engine:** Allow/block/HITL rules per tool
 - **Secret Management:** Secure secret resolution with `{{secret:KEY}}` template syntax
 - **HTTP Client:** Make outbound HTTP requests with SSRF protection, domain filtering, and secret injection
 - **Knowledge Graph Memory:** 12 tools for persistent knowledge storage with FTS5 search and graph traversal
   - Improved natural-language memory search recall (question-style queries)
-- **Plan Execution:** DAG-based multi-step workflows with concurrent execution, task references, and failure handling
+- **Plan Orchestration:** DAG-based multi-step workflows with ready-task discovery, task references, and failure handling
+  - External orchestrators execute tasks; backend tracks plan/task state
   - Plan reference resolution by `plan_id` (preferred) or unique plan name with ambiguity protection
 - **WebSocket Support:** Real-time notifications
 - **Operational Documentation:** Docker Hub publishing guide, LLM system prompt template, and auto-generated tool catalog
@@ -101,6 +105,7 @@ http://localhost:8080/admin/
 ```
 
 **Default Password:** `admin`
+- Password precedence: `ANYIDE_ADMIN_PASSWORD` > `ADMIN_PASSWORD` (legacy) > `config.yaml auth.admin_password` > default `admin`.
 
 The dashboard provides a unified view with expandable widgets:
 - HITL Approval Queue (approve/reject directly from dashboard)
@@ -218,6 +223,13 @@ curl -X POST http://localhost:8080/api/tools/docker/action \
 ```bash
 # Required
 ANYIDE_ADMIN_PASSWORD=your-secure-password
+# Legacy fallback: ADMIN_PASSWORD=your-secure-password
+
+# Precedence:
+# 1) ANYIDE_ADMIN_PASSWORD
+# 2) ADMIN_PASSWORD (legacy)
+# 3) config.yaml auth.admin_password
+# 4) default "admin"
 
 # Optional
 ANYIDE_WORKSPACE_BASE_DIR=/workspace
@@ -293,7 +305,8 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - ADMIN_PASSWORD=admin
+      - ANYIDE_ADMIN_PASSWORD=admin
+      # Legacy fallback: ADMIN_PASSWORD=admin
       - WORKSPACE_BASE_DIR=/workspace
     volumes:
       - ./workspace:/workspace
@@ -460,15 +473,18 @@ http://localhost:8080/admin/
   - Validates task dependencies for cycles using Kahn's algorithm
   - Computes execution levels for concurrent task scheduling
   - Returns `plan_id`, execution order, and task count
-- `plan_execute` - Execute a plan synchronously until completion
+- `plan_execute` - Get current ready tasks and plan progress snapshot
   - Pass `plan_id` from `plan_create` response
   - Resilience fallback: a unique plan name is accepted; ambiguous names are rejected
-  - Topological sort ensures correct dependency order
-  - Concurrent execution via `asyncio.gather` for tasks at same level
-  - Task reference resolution: `{{task:TASK_ID.field}}` in params
+  - Moves plan from `pending` to `running` on first call
+  - Returns `ready_tasks` with dependency-checked, reference-resolved params
+- `plan_update_task` - Update a task after external execution
+  - Mark task `running`, `completed` (with `output`), or `failed` (with `error`)
+  - Enforces failure policies: `stop`, `skip_dependents`, `continue`
+  - Computes next ready tasks after each update
+- Plan task references: `{{task:TASK_ID.field}}` in downstream params
   - Three failure policies: `stop`, `skip_dependents`, `continue`
   - Per-task `on_failure` override for fine-grained control
-  - HITL integration: tasks with `require_hitl=True` block for approval
 - `plan_status` - Get plan and per-task status
   - Prefer `plan_id` from `plan_create`; unique names are accepted when unambiguous
   - Task states: pending, running, completed, failed, skipped
@@ -618,7 +634,7 @@ npm run dev
 
 ### Core Platform
 - FastAPI service exposes MCP (`/mcp`) and OpenAPI (`/api/tools/*`) interfaces from one backend.
-- SQLite persists audit history, HITL state, memory graph data, and plan execution data.
+- SQLite persists audit history, HITL state, memory graph data, and plan orchestration state.
 
 ### Security and Governance
 - Workspace boundary enforcement prevents path traversal and out-of-scope file access.
@@ -630,16 +646,18 @@ npm run dev
 - Password-protected dashboard with real-time HITL queue, health metrics, and recent activity.
 - Tool explorer, configuration viewer, audit filtering/export, and container log views.
 - Session expiry handling redirects users to `/admin/login` after unauthorized responses.
+- Admin API accepts session cookies and `Authorization: Bearer <token>` fallback.
+- Dashboard API/WebSocket clients support reverse-proxy path prefixes.
 
 ### Tooling
 - Filesystem, shell, git, docker, workspace, and HTTP tool categories.
 - Memory graph tooling with full-text search and relationship traversal.
-- DAG plan execution with concurrency, task references, and configurable failure policies.
+- DAG plan orchestration with ready-task snapshots, task references, and configurable failure policies.
 
 ### Test Coverage Snapshot
-- `pytest --collect-only -q` reports 434 backend tests.
+- `pytest --collect-only -q` reports 437 backend tests.
 - Memory tool suite: 48 tests.
-- Plan execution suite: 57 tests.
+- Plan orchestration suite: 22 tests.
 - HITL WebSocket roundtrip tests: 7 tests.
 - Tool Explorer contract tests: 13 tests.
 - Frontend admin auth/session tests run with Vitest + jsdom.
@@ -684,7 +702,7 @@ Contributions are welcome. Prefer focused pull requests, include tests for behav
 ### Common Issues
 
 - **Blank admin page:** Check browser console, verify assets loading
-- **Login fails:** Verify ADMIN_PASSWORD in docker-compose.yaml
+- **Login fails:** Verify effective password precedence and container env (`ANYIDE_ADMIN_PASSWORD` preferred, `ADMIN_PASSWORD` legacy).
 - **HITL not appearing:** Check WebSocket connection in browser console
 - **Tool execution fails:** Check audit log for error details
 
@@ -701,7 +719,7 @@ Built following the design principles from:
 
 **Status:** Production Ready  
 **Version:** 0.1.0  
-**Last Updated:** March 1, 2026
+**Last Updated:** March 2, 2026
 
 ---
 
@@ -709,14 +727,14 @@ Built following the design principles from:
 
 The project includes comprehensive test coverage.
 
-As of this snapshot, `pytest --collect-only -q` reports **434 tests collected** across:
+As of this snapshot, `pytest --collect-only -q` reports **437 tests collected** across:
 
 - Unit tests for core modules and tool implementations
 - API and admin endpoint integration tests
 - MCP protocol and HITL workflow tests
 - Security regression tests (path traversal, SSRF, auth enforcement, input handling)
 - Load/concurrency tests for frequent file and API operations
-- Feature-specific suites for Git, Docker, memory graph, plan execution, secrets, and HTTP
+- Feature-specific suites for Git, Docker, memory graph, plan orchestration, secrets, and HTTP
 - Tool Explorer contract tests verifying OpenAPI-based tool listing
 - HITL WebSocket roundtrip and disconnect resilience tests
 - Frontend unit tests (Vitest + jsdom) for admin auth/session behavior

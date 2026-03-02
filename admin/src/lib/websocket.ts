@@ -16,6 +16,7 @@ export class WebSocketClient {
   private reconnectDelay = 1000
   private maxReconnectDelay = 30000
   private isConnecting = false
+  private pendingMessages: any[] = []
 
   connect() {
     // Prevent multiple simultaneous connections
@@ -27,7 +28,10 @@ export class WebSocketClient {
     this.isConnecting = true
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
-    const wsUrl = `${protocol}//${host}/ws/hitl`
+    const pathname = window.location.pathname || '/'
+    const adminIndex = pathname.indexOf('/admin')
+    const prefix = adminIndex > 0 ? pathname.slice(0, adminIndex) : ''
+    const wsUrl = `${protocol}//${host}${prefix}/ws/hitl`
     
     this.ws = new WebSocket(wsUrl)
     
@@ -35,6 +39,14 @@ export class WebSocketClient {
       console.log('WebSocket connected')
       this.reconnectDelay = 1000
       this.isConnecting = false
+
+      // Flush messages queued while the connection was opening.
+      if (this.pendingMessages.length > 0 && this.ws?.readyState === WebSocket.OPEN) {
+        for (const message of this.pendingMessages) {
+          this.ws.send(JSON.stringify(message))
+        }
+        this.pendingMessages = []
+      }
     }
     
     this.ws.onmessage = (event) => {
@@ -89,8 +101,13 @@ export class WebSocketClient {
   send(message: any) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message))
-    } else {
-      console.error('WebSocket is not connected')
+      return
+    }
+
+    this.pendingMessages.push(message)
+
+    if (!this.isConnecting) {
+      this.connect()
     }
   }
 

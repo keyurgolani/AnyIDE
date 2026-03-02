@@ -127,7 +127,6 @@ export interface SecretsReloadResponse {
 }
 
 export class API {
-  private baseUrl = window.location.origin
   private handlingUnauthorized = false
   private authStore: AuthStoreLike
   private fetchImpl: typeof fetch
@@ -135,8 +134,21 @@ export class API {
 
   constructor(options: APIOptions = {}) {
     this.authStore = options.authStore ?? useAuthStore
-    this.fetchImpl = options.fetchImpl ?? fetch
+    this.fetchImpl =
+      options.fetchImpl ??
+      // Bind native fetch to window to avoid "Illegal invocation" when called as a class property method.
+      (typeof window !== 'undefined' && typeof window.fetch === 'function'
+        ? window.fetch.bind(window)
+        : fetch)
     this.location = options.location ?? window.location
+  }
+
+  private getBaseUrl(): string {
+    // Support deployments behind a path prefix, e.g. /myapp/admin/.
+    const pathname = this.location.pathname || '/'
+    const adminIndex = pathname.indexOf('/admin')
+    const prefix = adminIndex > 0 ? pathname.slice(0, adminIndex) : ''
+    return `${window.location.origin}${prefix}`
   }
 
   private handleUnauthorized() {
@@ -158,9 +170,16 @@ export class API {
     init?: RequestInit,
     options?: { skipAuthRedirect?: boolean }
   ): Promise<Response> {
-    const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+    const headers = new Headers(init?.headers ?? {})
+    const sessionToken = this.authStore.getState().sessionToken
+    if (sessionToken && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${sessionToken}`)
+    }
+
+    const response = await this.fetchImpl(`${this.getBaseUrl()}${path}`, {
       credentials: 'include',
       ...init,
+      headers,
     })
 
     if (response.status === 401 && !options?.skipAuthRedirect) {
@@ -182,7 +201,13 @@ export class API {
     )
 
     if (!response.ok) {
-      throw new Error('Invalid password')
+      if (response.status === 401) {
+        throw new Error('Invalid password')
+      }
+      if (response.status === 404) {
+        throw new Error('Login endpoint not found (404). Check URL/port and proxy path.')
+      }
+      throw new Error(`Login failed (${response.status})`)
     }
 
     return response.json()
@@ -324,7 +349,21 @@ export class API {
       throw new Error('Failed to fetch containers')
     }
 
-    return response.json()
+    const payload: unknown = await response.json()
+
+    // Backward/forward compatibility: some backends return an array, others wrap it.
+    if (Array.isArray(payload)) {
+      return payload as ContainerInfo[]
+    }
+    if (
+      payload &&
+      typeof payload === 'object' &&
+      Array.isArray((payload as { containers?: unknown }).containers)
+    ) {
+      return (payload as { containers: ContainerInfo[] }).containers
+    }
+
+    throw new Error('Invalid container list response')
   }
 
   async getContainerLogs(containerId: string, tail = 100): Promise<ContainerLogs> {

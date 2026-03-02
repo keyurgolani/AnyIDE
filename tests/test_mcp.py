@@ -222,7 +222,7 @@ class TestMCPToolParity:
         "memory_delete", "memory_link", "memory_children", "memory_ancestors",
         "memory_related", "memory_subtree", "memory_roots", "memory_stats",
         # Plan tools
-        "plan_create", "plan_execute", "plan_status", "plan_list", "plan_cancel",
+        "plan_create", "plan_execute", "plan_update_task", "plan_status", "plan_list", "plan_cancel",
     }
 
     # Admin/auth operation IDs that should NEVER appear in MCP

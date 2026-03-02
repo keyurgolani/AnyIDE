@@ -26,8 +26,8 @@ export default function LoginPage() {
       const { token } = await api.login(password)
       login(token)
       navigate('/')
-    } catch (err) {
-      setError('Invalid password. Please try again.')
+    } catch (err: any) {
+      setError(err?.message || 'Login failed. Please try again.')
     } finally {
       setLoading(false)
     }
