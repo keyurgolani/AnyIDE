@@ -53,6 +53,7 @@ class WorkspaceTools:
             "http",
             "memory",
             "plan",
+            "skills",
         ]
         if self.tool_categories_provider is not None:
             dynamic_categories = self.tool_categories_provider()

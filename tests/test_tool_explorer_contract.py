@@ -134,7 +134,7 @@ class TestToolExplorerOpenAPIContract:
 
         valid_categories = {
             "fs", "workspace", "shell", "git", "docker",
-            "http", "memory", "plan", "language"
+            "http", "memory", "plan", "language", "skills"
         }
 
         for tool in tools_data["tools"]:

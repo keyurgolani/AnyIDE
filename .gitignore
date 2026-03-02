@@ -66,6 +66,7 @@ data/
 
 # Workspace (user data - not tracked)
 /workspace/
+/skills/
 
 # Logs
 *.log

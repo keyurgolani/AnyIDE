@@ -78,10 +78,15 @@ curl -s http://localhost:8080/openapi.json | jq '.paths | keys[]' | grep '/api/t
 curl -s http://localhost:8080/openapi.json | jq '.paths | keys[]' | grep '/api/tools/http/' || true
 
 # Start with an explicit allowlist
-ANYIDE_MODULES=fs,workspace,shell,git,memory,plan,language docker compose up -d --build
+ANYIDE_MODULES=fs,workspace,shell,git,memory,plan,language,skills docker compose up -d --build
 ```
 
 If `jq` is not installed, save `openapi.json` and inspect it manually.
+
+For skills module operation modes:
+- Ensure a dedicated `./skills:/skills` volume mount exists in `docker-compose.yaml`.
+- Offline-capable tools: `skills_list`, `skills_read`, `skills_read_file`.
+- Network-required tools: `skills_search`, `skills_install` (HITL-gated).
 
 ### Workspace Information
 
@@ -424,6 +429,58 @@ curl -X POST http://localhost:8080/api/tools/language/search_symbols \
 curl -X POST http://localhost:8080/api/tools/language/validate \
   -H "Content-Type: application/json" \
   -d '{"path":"src/app.py","checks":["syntax","lint"]}'
+```
+
+## Skills Module
+
+### Offline-Capable Skill Reads
+
+**"List installed skills"**
+- Calls `skills_list` and reads local `/skills` only
+
+**"Read the SKILL.md for the vitest skill"**
+- Calls `skills_read` with `name: "vitest"`
+- Supports optional `section` extraction
+
+**"Read scripts/install.sh from the vitest skill"**
+- Calls `skills_read_file` with `name` + relative `file_path`
+- File path is constrained to the selected skill directory
+
+### Online Registry Actions
+
+**"Search for skills about React testing"**
+- Calls `skills_search` (`npx skills find ... --json`)
+- Requires outbound network access
+
+**"Install the vitest skill from vercel-labs/agent-skills"** (requires approval)
+- Calls `skills_install` (HITL-gated by default)
+- Fails with a clear network/egress error if outbound access is blocked
+
+### Curl Examples
+
+```bash
+# List local installed skills
+curl -X POST http://localhost:8080/api/tools/skills/list
+
+# Read a skill (optionally include "section":"Usage")
+curl -X POST http://localhost:8080/api/tools/skills/read \
+  -H "Content-Type: application/json" \
+  -d '{"name":"vitest"}'
+
+# Read a nested skill file
+curl -X POST http://localhost:8080/api/tools/skills/read_file \
+  -H "Content-Type: application/json" \
+  -d '{"name":"vitest","file_path":"scripts/install.sh"}'
+
+# Search remote skills
+curl -X POST http://localhost:8080/api/tools/skills/search \
+  -H "Content-Type: application/json" \
+  -d '{"query":"react testing","max_results":5}'
+
+# Install a skill (will enter HITL queue)
+curl -X POST http://localhost:8080/api/tools/skills/install \
+  -H "Content-Type: application/json" \
+  -d '{"repo":"vercel-labs/agent-skills","skill_name":"vitest"}'
 ```
 
 ## Secrets and HTTP Tools
@@ -799,6 +856,24 @@ As of this version, AnyIDE supports:
     - Configurable timeout (up to server's max_timeout)
     - Response truncation at configured `max_response_size_kb`
 
+- **Language Tools** (category: `language`)
+  - `lang_read_file` - Read files using structural windows (`function:`, `class:`, `import:*`, `lines:`)
+  - `lang_skeleton` - Return class/function/method skeleton with line ranges
+  - `lang_diff` - Produce function-anchored diffs with syntax validation
+  - `lang_apply_patch` - Apply anchored patch hunks with backup + validation options
+  - `lang_create_file` - Create files with syntax/lint validation and symbol extraction
+  - `lang_index` - Build/update workspace symbol index
+  - `lang_search_symbols` - Query indexed symbols by wildcard/name/kind/language
+  - `lang_reference_graph` - Build baseline reference graph for file/workspace scope
+  - `lang_validate` - Run syntax and linter checks
+
+- **Skills Tools** (category: `skills`)
+  - `skills_list` - List locally installed skills from isolated `/skills` storage
+  - `skills_read` - Read `SKILL.md` content (optional section extraction)
+  - `skills_read_file` - Read scripts/references files within a skill directory
+  - `skills_search` - Search remote skills registry (`npx skills find ... --json`)
+  - `skills_install` - Install skills from remote repo (HITL required; network egress needed)
+
 - **Plan Tools** (category: `plan`)
   - `plan_create` - Create a plan with DAG validation
     - Validates task dependencies, detects cycles via Kahn's algorithm
@@ -846,6 +921,20 @@ When using MCP clients (Claude Desktop, Cursor, etc.), tools are identified by t
 - `workspace_info` - Workspace information
 - `workspace_secrets_list` - List secret key names
 - `http_request` - Make outbound HTTP requests
+- `lang_read_file` - Read files with structure-aware windows
+- `lang_skeleton` - Get file skeleton
+- `lang_diff` - Generate function-anchored diffs
+- `lang_apply_patch` - Apply anchored patch hunks
+- `lang_create_file` - Create code files with validation
+- `lang_index` - Build/update symbol index
+- `lang_search_symbols` - Search indexed symbols
+- `lang_reference_graph` - Build baseline reference graph
+- `lang_validate` - Run syntax/lint validation
+- `skills_list` - List installed skills
+- `skills_read` - Read SKILL.md content
+- `skills_read_file` - Read files inside skill directories
+- `skills_search` - Search remote skills registry
+- `skills_install` - Install remote skills (HITL-gated)
 - `memory_store` - Store a knowledge node
 - `memory_get` - Retrieve a node with its relationships
 - `memory_search` - Full-text search across knowledge graph
@@ -894,6 +983,20 @@ When using REST API directly:
 - `POST /api/tools/workspace/info` - Workspace information
 - `POST /api/tools/workspace/secrets/list` - List secret key names
 - `POST /api/tools/http/request` - Make outbound HTTP requests
+- `POST /api/tools/language/read_file` - Read file with structural windowing
+- `POST /api/tools/language/skeleton` - Get file skeleton
+- `POST /api/tools/language/diff` - Generate function-anchored diff
+- `POST /api/tools/language/apply_patch` - Apply anchored patch
+- `POST /api/tools/language/create_file` - Create code file with validation
+- `POST /api/tools/language/index` - Index workspace symbols
+- `POST /api/tools/language/search_symbols` - Search indexed symbols
+- `POST /api/tools/language/reference_graph` - Build reference graph
+- `POST /api/tools/language/validate` - Validate syntax/lint
+- `POST /api/tools/skills/list` - List locally installed skills
+- `POST /api/tools/skills/read` - Read SKILL.md content
+- `POST /api/tools/skills/read_file` - Read a specific skill file
+- `POST /api/tools/skills/search` - Search remote skills registry
+- `POST /api/tools/skills/install` - Install skill from remote repo (HITL-gated)
 - `POST /api/tools/memory/store` - Store a knowledge node
 - `POST /api/tools/memory/get` - Retrieve a node with relations
 - `POST /api/tools/memory/search` - Full-text search knowledge graph

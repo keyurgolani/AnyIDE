@@ -73,6 +73,12 @@ class ModulesConfig(BaseModel):
     disabled: List[str] = Field(default_factory=list)
 
 
+class SkillsConfig(BaseModel):
+    """Skills module storage configuration."""
+
+    base_dir: str = "/skills"
+
+
 class LanguageConfig(BaseModel):
     """Language module configuration."""
 
@@ -170,6 +176,7 @@ class ToolsConfig(BaseModel):
     shell: Dict[str, ToolPolicyConfig] = Field(default_factory=dict)
     http: Dict[str, ToolPolicyConfig] = Field(default_factory=dict)
     language: Dict[str, ToolPolicyConfig] = Field(default_factory=dict)
+    skills: Dict[str, ToolPolicyConfig] = Field(default_factory=dict)
 
 
 class Config(BaseModel):
@@ -183,6 +190,7 @@ class Config(BaseModel):
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
     http: HttpConfig = Field(default_factory=HttpConfig)
     modules: ModulesConfig = Field(default_factory=ModulesConfig)
+    skills: SkillsConfig = Field(default_factory=SkillsConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     language: LanguageConfig = Field(default_factory=LanguageConfig)
 

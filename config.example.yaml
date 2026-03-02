@@ -29,6 +29,9 @@ modules:
   enabled: []
   disabled: []
 
+skills:
+  base_dir: "/skills"
+
 language:
   linters:
     python: "ruff"
@@ -92,6 +95,18 @@ tools:
       policy: "allow"
     validate:
       policy: "allow"
+
+  skills:
+    list:
+      policy: "allow"
+    read:
+      policy: "allow"
+    read_file:
+      policy: "allow"
+    search:
+      policy: "allow"
+    install:
+      policy: "hitl"
       
   docker:
     list:

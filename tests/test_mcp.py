@@ -227,6 +227,8 @@ class TestMCPToolParity:
         "lang_read_file", "lang_skeleton", "lang_diff", "lang_apply_patch",
         "lang_create_file", "lang_index", "lang_search_symbols",
         "lang_reference_graph", "lang_validate",
+        # Skills tools
+        "skills_list", "skills_read", "skills_read_file", "skills_search", "skills_install",
     }
 
     # Admin/auth operation IDs that should NEVER appear in MCP
@@ -242,7 +244,7 @@ class TestMCPToolParity:
 
     # Tool tags that should be included in MCP
     TOOL_TAGS = {
-        "filesystem", "workspace", "shell", "git", "docker", "http", "memory", "plan", "language"
+        "filesystem", "workspace", "shell", "git", "docker", "http", "memory", "plan", "language", "skills"
     }
 
     @pytest.mark.asyncio

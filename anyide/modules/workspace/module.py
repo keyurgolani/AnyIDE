@@ -77,6 +77,7 @@ class WorkspaceModule(ToolModule):
                 "http",
                 "memory",
                 "plan",
+                "skills",
             ],
         )
         self._dispatch = _WorkspaceDispatch(self)

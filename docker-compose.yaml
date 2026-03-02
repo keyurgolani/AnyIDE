@@ -13,9 +13,13 @@ services:
       - LOG_LEVEL=${ANYIDE_LOG_LEVEL:-${LOG_LEVEL:-INFO}}
       - HITL_TTL_SECONDS=${ANYIDE_HITL_TTL_SECONDS:-${HITL_TTL_SECONDS:-300}}
       - ANYIDE_MODULES=${ANYIDE_MODULES:-all}
+      - ANYIDE_SKILLS_BASE_DIR=${ANYIDE_SKILLS_BASE_DIR:-/skills}
     volumes:
       # Workspace mount — user configures this
       - ${ANYIDE_HOST_WORKSPACE_DIR:-${HOST_WORKSPACE_DIR}}:/workspace
+
+      # Skills storage mount — isolated from workspace
+      - ${ANYIDE_HOST_SKILLS_DIR:-./skills}:/skills
 
       # Docker socket for container management (optional, for Docker tools)
       - /var/run/docker.sock:/var/run/docker.sock:ro

@@ -3,6 +3,8 @@ FROM python:3.12-slim
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Allow git to operate on host-mounted volumes regardless of directory ownership.
@@ -26,8 +28,8 @@ COPY admin/dist/ ./static/admin/
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Create data and secrets directories
-RUN mkdir -p /data /secrets
+# Create data, secrets, and skills directories
+RUN mkdir -p /data /secrets /skills
 
 EXPOSE 8080
 

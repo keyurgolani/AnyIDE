@@ -47,6 +47,10 @@ Built-in admin dashboard provides human oversight, HITL (Human-in-the-Loop) appr
   - `lang_diff` and `lang_apply_patch` for function-anchored edit workflows with backup + validation
   - `lang_create_file`, `lang_validate`, `lang_index`, `lang_search_symbols`, `lang_reference_graph`
   - Incremental SQLite-backed symbol index and baseline linter routing (ruff for Python)
+- **Skills Module:** Isolated `/skills` storage and skills.sh integration
+  - Offline-capable local tools: `skills_list`, `skills_read`, `skills_read_file`
+  - Online tools: `skills_search` (`npx skills find ... --json`) and HITL-gated `skills_install`
+  - Robust CLI parsing/error normalization (JSON + ANSI/plaintext fallback for search output)
 - **Workspace Management:** Secure path resolution and boundary enforcement
 - **HITL System:** Real-time approval workflow for sensitive operations
 - **Admin Dashboard:** Premium UI with real-time updates
@@ -188,6 +192,19 @@ curl -X POST http://localhost:8080/api/tools/language/read_file \
 curl -X POST http://localhost:8080/api/tools/language/validate \
   -H "Content-Type: application/json" \
   -d '{"path":"main.py","checks":["syntax","lint"]}'
+
+# List installed local skills (offline-capable)
+curl -X POST http://localhost:8080/api/tools/skills/list
+
+# Search remote skills registry
+curl -X POST http://localhost:8080/api/tools/skills/search \
+  -H "Content-Type: application/json" \
+  -d '{"query":"react testing","max_results":5}'
+
+# Install a skill (HITL-gated)
+curl -X POST http://localhost:8080/api/tools/skills/install \
+  -H "Content-Type: application/json" \
+  -d '{"repo":"vercel-labs/agent-skills","skill_name":"vitest"}'
 ```
 
 ### 4. Approve in Dashboard
@@ -226,6 +243,7 @@ curl -X POST http://localhost:8080/api/tools/language/validate \
 │                                         │
 │  Volumes:                               │
 │  • /workspace (host directories)        │
+│  • /skills (isolated skill storage)     │
 │  • /data (SQLite, logs)                 │
 │  • /secrets (secrets.env)               │
 └─────────────────────────────────────────┘
@@ -255,12 +273,14 @@ ANYIDE_AUDIT_RETENTION_DAYS=30
 ANYIDE_LOG_LEVEL=INFO
 ANYIDE_HITL_TTL_SECONDS=300
 ANYIDE_MODULES=all
+ANYIDE_SKILLS_BASE_DIR=/skills
+ANYIDE_HOST_SKILLS_DIR=./skills
 ```
 
 `ANYIDE_MODULES` supports:
 - `all` (default): load all built-in modules
 - `all,-docker,-http`: load all except listed modules
-- `fs,workspace,shell,git,memory,plan,language`: explicit allowlist
+- `fs,workspace,shell,git,memory,plan,language,skills`: explicit allowlist
 
 ### Module Selection (`config.yaml`)
 
@@ -271,6 +291,18 @@ modules:
 ```
 
 Environment variable `ANYIDE_MODULES` overrides `modules.enabled/disabled`.
+
+### Skills Storage and Connectivity (`config.yaml`)
+
+```yaml
+skills:
+  base_dir: /skills
+```
+
+- `skills.base_dir` is isolated from workspace paths and should be mounted as a separate volume.
+- Offline mode: `skills_list`, `skills_read`, and `skills_read_file` work from local `/skills` content.
+- Online mode: `skills_search` and `skills_install` require outbound network access.
+- `skills_install` is HITL-gated by default because it downloads and executes external code.
 
 ### LLM Endpoints (`config.yaml`)
 
@@ -344,8 +376,10 @@ services:
       - ANYIDE_ADMIN_PASSWORD=admin
       # Legacy fallback: ADMIN_PASSWORD=admin
       - WORKSPACE_BASE_DIR=/workspace
+      - ANYIDE_SKILLS_BASE_DIR=/skills
     volumes:
       - ./workspace:/workspace
+      - ./skills:/skills
       - ./data:/data
       - ./secrets.env:/secrets/secrets.env:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro  # For Docker tools
@@ -543,6 +577,14 @@ http://localhost:8080/admin/
 - `lang_reference_graph` - Build baseline file/workspace function reference graph
 - `lang_validate` - Run syntax and language-routed lint checks
 
+### Skills
+
+- `skills_list` - List installed skills from isolated `/skills` storage (offline-capable)
+- `skills_read` - Read `SKILL.md` content with optional section extraction
+- `skills_read_file` - Read scripts/references files within an installed skill directory
+- `skills_search` - Search remote skills registry using `npx skills find ... --json`
+- `skills_install` - Install skills from remote repos (HITL-gated; requires network egress)
+
 ---
 
 ## Security
@@ -601,6 +643,10 @@ http://localhost:8080/admin/
 │       │   ├── module.py
 │       │   ├── tools.py
 │       │   ├── treesitter.py
+│       │   └── schemas.py
+│       ├── skills/
+│       │   ├── module.py
+│       │   ├── tools.py
 │       │   └── schemas.py
 │       └── ...
 ├── admin/                 # React dashboard
@@ -708,12 +754,12 @@ npm run dev
 - Dashboard API/WebSocket clients support reverse-proxy path prefixes.
 
 ### Tooling
-- Filesystem, shell, git, docker, workspace, and HTTP tool categories.
+- Filesystem, shell, git, docker, workspace, HTTP, language, and skills tool categories.
 - Memory graph tooling with full-text search and relationship traversal.
 - DAG plan orchestration with ready-task snapshots, task references, and configurable failure policies.
 
 ### Test Coverage Snapshot
-- `pytest --collect-only -q` reports 457 backend tests.
+- `pytest --collect-only -q` reports 481 backend tests.
 - Memory tool suite: 48 tests.
 - Plan orchestration suite: 22 tests.
 - HITL WebSocket roundtrip tests: 7 tests.
@@ -786,7 +832,7 @@ Built following the design principles from:
 
 The project includes comprehensive test coverage.
 
-As of this snapshot, `pytest --collect-only -q` reports **457 tests collected** across:
+As of this snapshot, `pytest --collect-only -q` reports **481 tests collected** across:
 
 - Unit tests for core modules and tool implementations
 - API and admin endpoint integration tests
