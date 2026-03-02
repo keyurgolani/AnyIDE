@@ -73,6 +73,26 @@ class ModulesConfig(BaseModel):
     disabled: List[str] = Field(default_factory=list)
 
 
+class LanguageConfig(BaseModel):
+    """Language module configuration."""
+
+    linters: Dict[str, str] = Field(
+        default_factory=lambda: {
+            "python": "ruff",
+            "javascript": "biome",
+            "typescript": "biome",
+            "go": "golangci-lint",
+        }
+    )
+    lsp_servers: Dict[str, str] = Field(
+        default_factory=lambda: {
+            "python": "pyright",
+            "typescript": "typescript-language-server",
+            "go": "gopls",
+        }
+    )
+
+
 class LLMEndpointConfig(BaseModel):
     """LLM endpoint configuration."""
 
@@ -149,6 +169,7 @@ class ToolsConfig(BaseModel):
     workspace: Dict[str, ToolPolicyConfig] = Field(default_factory=dict)
     shell: Dict[str, ToolPolicyConfig] = Field(default_factory=dict)
     http: Dict[str, ToolPolicyConfig] = Field(default_factory=dict)
+    language: Dict[str, ToolPolicyConfig] = Field(default_factory=dict)
 
 
 class Config(BaseModel):
@@ -163,6 +184,7 @@ class Config(BaseModel):
     http: HttpConfig = Field(default_factory=HttpConfig)
     modules: ModulesConfig = Field(default_factory=ModulesConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
+    language: LanguageConfig = Field(default_factory=LanguageConfig)
 
 
 def get_admin_password_override() -> tuple[Optional[str], Optional[str]]:

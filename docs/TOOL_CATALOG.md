@@ -193,7 +193,7 @@ Note: The 'follow' parameter is not recommended for API calls and defaults to fa
 
 List contents of a directory.
 
-The path is relative to the workspace directory unless an absolute 
+The path is relative to the workspace directory unless an absolute
 path within the workspace is provided.
 
 Use this tool when you need to:
@@ -229,8 +229,8 @@ Supports glob patterns like '*.py', 'test_*.txt' for filtering.
 
 Read the contents of a file at the specified path.
 
-The path is relative to the workspace directory unless an absolute 
-path within the workspace is provided. Returns the file contents 
+The path is relative to the workspace directory unless an absolute
+path within the workspace is provided. Returns the file contents
 as text.
 
 Use this tool when you need to:
@@ -265,7 +265,7 @@ Optional: encoding, max_lines (for large files), line_start/line_end (for specif
 
 Search for files by name or content.
 
-The path is relative to the workspace directory unless an absolute 
+The path is relative to the workspace directory unless an absolute
 path within the workspace is provided.
 
 Use this tool when you need to:
@@ -275,7 +275,7 @@ Use this tool when you need to:
 - Discover files matching patterns
 
 Required: query
-Optional: path (default: '.'), workspace_dir, search_type ('filename', 'content', 'both'), 
+Optional: path (default: '.'), workspace_dir, search_type ('filename', 'content', 'both'),
          regex, max_results, include_content_preview
 
 Supports both simple text search and regex patterns.
@@ -303,7 +303,7 @@ Supports both simple text search and regex patterns.
 
 Write content to a file at the specified path.
 
-The path is relative to the workspace directory unless an absolute 
+The path is relative to the workspace directory unless an absolute
 path within the workspace is provided.
 
 Use this tool when you need to:
@@ -748,6 +748,170 @@ Optional: method (default: GET), headers, body, json_body, timeout (max 120s), f
 
 ---
 
+## LANGUAGE Tools
+
+### apply_patch
+
+**Endpoint:** `POST /api/tools/language/apply_patch`
+
+
+**Summary:** Apply Function-Anchored Patch
+
+
+**Request Body:**
+
+
+**Responses:**
+
+- **200:** Successful Response
+- **422:** Validation Error
+
+---
+
+### create_file
+
+**Endpoint:** `POST /api/tools/language/create_file`
+
+
+**Summary:** Create Code File with Validation
+
+
+**Request Body:**
+
+
+**Responses:**
+
+- **200:** Successful Response
+- **422:** Validation Error
+
+---
+
+### diff
+
+**Endpoint:** `POST /api/tools/language/diff`
+
+
+**Summary:** Create Language-Aware Diff
+
+
+**Request Body:**
+
+
+**Responses:**
+
+- **200:** Successful Response
+- **422:** Validation Error
+
+---
+
+### index
+
+**Endpoint:** `POST /api/tools/language/index`
+
+
+**Summary:** Index Workspace Symbols
+
+
+**Request Body:**
+
+
+**Responses:**
+
+- **200:** Successful Response
+- **422:** Validation Error
+
+---
+
+### read_file
+
+**Endpoint:** `POST /api/tools/language/read_file`
+
+
+**Summary:** Read File with Structure Awareness
+
+
+**Request Body:**
+
+
+**Responses:**
+
+- **200:** Successful Response
+- **422:** Validation Error
+
+---
+
+### reference_graph
+
+**Endpoint:** `POST /api/tools/language/reference_graph`
+
+
+**Summary:** Build Function Reference Graph
+
+
+**Request Body:**
+
+
+**Responses:**
+
+- **200:** Successful Response
+- **422:** Validation Error
+
+---
+
+### search_symbols
+
+**Endpoint:** `POST /api/tools/language/search_symbols`
+
+
+**Summary:** Search Indexed Symbols
+
+
+**Request Body:**
+
+
+**Responses:**
+
+- **200:** Successful Response
+- **422:** Validation Error
+
+---
+
+### skeleton
+
+**Endpoint:** `POST /api/tools/language/skeleton`
+
+
+**Summary:** Get File Skeleton
+
+
+**Request Body:**
+
+
+**Responses:**
+
+- **200:** Successful Response
+- **422:** Validation Error
+
+---
+
+### validate
+
+**Endpoint:** `POST /api/tools/language/validate`
+
+
+**Summary:** Validate Syntax and Linting
+
+
+**Request Body:**
+
+
+**Responses:**
+
+- **200:** Successful Response
+- **422:** Validation Error
+
+---
+
 ## MEMORY Tools
 
 ### ancestors
@@ -1111,6 +1275,9 @@ Cancel a plan, marking all pending and running tasks as skipped.
 A cancelled plan cannot be re-executed — create a new plan to re-run.
 Useful for aborting long-running plans.
 
+Input `plan_id` should be the `plan_id` returned by `plan_create`.
+For resilience, a unique plan name is also accepted; ambiguous names return an error.
+
 
 **Request Body:**
 
@@ -1140,6 +1307,7 @@ Task params may contain `{{task:TASK_ID.field}}` references resolved at runtime.
 
 Validates the DAG at creation time using Kahn's algorithm (cycle detection, missing refs).
 Returns the execution order grouped by parallel level.
+The response includes `plan_id`; pass that value to `plan_execute`, `plan_update_task`, `plan_status`, and `plan_cancel`.
 
 on_failure policies (plan-level default, overridable per-task):
 - **stop**: abort all remaining tasks when any task fails (default)
@@ -1162,18 +1330,21 @@ on_failure policies (plan-level default, overridable per-task):
 **Endpoint:** `POST /api/tools/plan/execute`
 
 
-**Summary:** Execute Plan
+**Summary:** Get Ready Tasks
 
 
 **Description:**
 
-Execute a plan synchronously, blocking until all tasks complete.
+Evaluate plan readiness and return runnable tasks.
 
-Tasks at the same dependency level run **concurrently** via asyncio.gather.
-Task outputs are stored and can be referenced in downstream params via `{{task:ID.field}}`.
-Tasks with `require_hitl: true` block for human approval before executing.
+Input `plan_id` should be the `plan_id` returned by `plan_create`.
+For resilience, a unique plan name is also accepted; if multiple plans share that name, execution fails with an ambiguity error.
 
-Returns the final plan status and per-task counts.
+This endpoint does not execute tools. It marks a pending plan as running (first call),
+computes current `ready_tasks`, and resolves task refs in params using outputs from
+already completed tasks.
+
+Use `plan_update_task` after your orchestrator executes each task.
 
 
 **Request Body:**
@@ -1219,8 +1390,41 @@ Returns plan ID, name, status, task count, and timestamps for all plans.
 
 Get current status of a plan and all its tasks.
 
+Input `plan_id` should be the `plan_id` returned by `plan_create`.
+For resilience, a unique plan name is also accepted; ambiguous names return an error.
+
 Shows per-task status (pending|running|completed|failed|skipped),
 output, error messages, and timing information.
+
+
+**Request Body:**
+
+
+**Responses:**
+
+- **200:** Successful Response
+- **422:** Validation Error
+
+---
+
+### update_task
+
+**Endpoint:** `POST /api/tools/plan/update_task`
+
+
+**Summary:** Update Task Status
+
+
+**Description:**
+
+Update one task status after external execution.
+
+Use this endpoint after your orchestrator runs a ready task:
+- set status to `running` when execution starts
+- set status to `completed` with `output` when execution succeeds
+- set status to `failed` with `error` when execution fails
+
+Failure policies (`stop`, `skip_dependents`, `continue`) are enforced here.
 
 
 **Request Body:**
@@ -1362,6 +1566,15 @@ When using MCP clients, tools are identified by their operation IDs:
 - `git_stash` - git/stash
 - `git_status` - git/status
 - `http_request` - http/request
+- `lang_apply_patch` - language/apply_patch
+- `lang_create_file` - language/create_file
+- `lang_diff` - language/diff
+- `lang_index` - language/index
+- `lang_read_file` - language/read_file
+- `lang_reference_graph` - language/reference_graph
+- `lang_search_symbols` - language/search_symbols
+- `lang_skeleton` - language/skeleton
+- `lang_validate` - language/validate
 - `memory_ancestors` - memory/ancestors
 - `memory_children` - memory/children
 - `memory_delete` - memory/delete
@@ -1379,6 +1592,7 @@ When using MCP clients, tools are identified by their operation IDs:
 - `plan_execute` - plan/execute
 - `plan_list` - plan/list
 - `plan_status` - plan/status
+- `plan_update_task` - plan/update_task
 - `shell_execute` - shell/execute
 - `workspace_info` - workspace/info
 - `workspace_secrets_list` - workspace/secrets

@@ -231,6 +231,49 @@ class Database:
             ON plan_tasks(plan_id, status)
         """)
 
+        # Language module indexing tables
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS language_index_files (
+                workspace_dir TEXT NOT NULL,
+                path TEXT NOT NULL,
+                language TEXT NOT NULL,
+                mtime REAL NOT NULL,
+                size INTEGER NOT NULL,
+                indexed_at TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (workspace_dir, path)
+            )
+        """)
+
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS language_index_symbols (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                workspace_dir TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                language TEXT NOT NULL,
+                name TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                signature TEXT NOT NULL,
+                start_line INTEGER NOT NULL,
+                end_line INTEGER NOT NULL,
+                parent_name TEXT
+            )
+        """)
+
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_lang_files_workspace
+            ON language_index_files(workspace_dir, path)
+        """)
+
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_lang_symbols_lookup
+            ON language_index_symbols(workspace_dir, name, kind, language)
+        """)
+
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_lang_symbols_file
+            ON language_index_symbols(workspace_dir, file_path)
+        """)
+
         await self._connection.commit()
         logger.info("database_schema_initialized")
     

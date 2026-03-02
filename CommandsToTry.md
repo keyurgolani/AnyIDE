@@ -78,7 +78,7 @@ curl -s http://localhost:8080/openapi.json | jq '.paths | keys[]' | grep '/api/t
 curl -s http://localhost:8080/openapi.json | jq '.paths | keys[]' | grep '/api/tools/http/' || true
 
 # Start with an explicit allowlist
-ANYIDE_MODULES=fs,workspace,shell,git,memory,plan docker compose up -d --build
+ANYIDE_MODULES=fs,workspace,shell,git,memory,plan,language docker compose up -d --build
 ```
 
 If `jq` is not installed, save `openapi.json` and inspect it manually.
@@ -351,6 +351,80 @@ If `jq` is not installed, save `openapi.json` and inspect it manually.
 
 **"Checkout the feature branch"** (requires approval)
 - Switches to a different branch
+
+## Language Tools (Tree-sitter First)
+
+### Structure-Aware Reading
+
+**"Show me the skeleton of src/app.py"**
+- Calls `lang_skeleton` to list classes/functions/methods with line ranges
+
+**"Read only function process_data from src/app.py with line numbers"**
+- Calls `lang_read_file` with `window: "function:process_data"` and `format: "numbered"`
+
+**"Show only imports from src/app.py"**
+- Calls `lang_read_file` with `window: "import:*"`
+
+**"Read lines 40-80 from src/app.py"**
+- Calls `lang_read_file` with `window: "lines:40-80"`
+
+### Structural Editing
+
+**"Generate a function-anchored diff for this updated content in src/app.py"**
+- Calls `lang_diff` and returns anchored hunks + syntax validation
+
+**"Apply this anchored patch to src/app.py and validate after patch"**
+- Calls `lang_apply_patch` with `validate: true` and optional backup creation
+
+**"Create src/new_module.py with this code and validate it"**
+- Calls `lang_create_file` and returns parse/lint + symbol metadata
+
+### Indexing and Symbol Search
+
+**"Index the current workspace codebase"**
+- Calls `lang_index` (incremental SQLite index)
+
+**"Search symbols matching build_* in Python"**
+- Calls `lang_search_symbols` with wildcard query and language filter
+
+**"Build a reference graph for src/app.py"**
+- Calls `lang_reference_graph` for file-scope caller/callee edges
+
+### Validation
+
+**"Validate syntax and lint for src/app.py"**
+- Calls `lang_validate` with checks `["syntax","lint"]`
+
+**"Check if src/broken.py has syntax errors"**
+- Calls `lang_validate` with checks `["syntax"]`
+
+### Curl Examples
+
+```bash
+# Skeleton overview
+curl -X POST http://localhost:8080/api/tools/language/skeleton \
+  -H "Content-Type: application/json" \
+  -d '{"paths":["src/app.py"]}'
+
+# Function-scoped read
+curl -X POST http://localhost:8080/api/tools/language/read_file \
+  -H "Content-Type: application/json" \
+  -d '{"path":"src/app.py","window":"function:process_data","format":"numbered"}'
+
+# Workspace indexing + symbol search
+curl -X POST http://localhost:8080/api/tools/language/index \
+  -H "Content-Type: application/json" \
+  -d '{"force_reindex":true}'
+
+curl -X POST http://localhost:8080/api/tools/language/search_symbols \
+  -H "Content-Type: application/json" \
+  -d '{"query":"build_*","language":"python"}'
+
+# Syntax + lint
+curl -X POST http://localhost:8080/api/tools/language/validate \
+  -H "Content-Type: application/json" \
+  -d '{"path":"src/app.py","checks":["syntax","lint"]}'
+```
 
 ## Secrets and HTTP Tools
 

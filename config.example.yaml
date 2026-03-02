@@ -29,6 +29,17 @@ modules:
   enabled: []
   disabled: []
 
+language:
+  linters:
+    python: "ruff"
+    javascript: "biome"
+    typescript: "biome"
+    go: "golangci-lint"
+  lsp_servers:
+    python: "pyright"
+    typescript: "typescript-language-server"
+    go: "gopls"
+
 # Tool Policies
 tools:
   defaults:
@@ -58,6 +69,28 @@ tools:
     info:
       policy: "allow"
     secrets_list:
+      policy: "allow"
+
+  language:
+    read_file:
+      policy: "allow"
+    skeleton:
+      policy: "allow"
+    diff:
+      policy: "allow"
+    apply_patch:
+      policy: "allow"
+      workspace_override: "hitl"
+    create_file:
+      policy: "allow"
+      workspace_override: "hitl"
+    index:
+      policy: "allow"
+    search_symbols:
+      policy: "allow"
+    reference_graph:
+      policy: "allow"
+    validate:
       policy: "allow"
       
   docker:

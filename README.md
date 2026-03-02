@@ -42,6 +42,11 @@ Built-in admin dashboard provides human oversight, HITL (Human-in-the-Loop) appr
   - Control container lifecycle (start, stop, restart, pause, unpause)
   - HITL approval for destructive operations
   - Docker socket integration with security controls
+- **Language Tools (Tree-sitter First):** IDE-grade structural code tooling
+  - `lang_skeleton` and `lang_read_file` for structure-aware code navigation
+  - `lang_diff` and `lang_apply_patch` for function-anchored edit workflows with backup + validation
+  - `lang_create_file`, `lang_validate`, `lang_index`, `lang_search_symbols`, `lang_reference_graph`
+  - Incremental SQLite-backed symbol index and baseline linter routing (ruff for Python)
 - **Workspace Management:** Secure path resolution and boundary enforcement
 - **HITL System:** Real-time approval workflow for sensitive operations
 - **Admin Dashboard:** Premium UI with real-time updates
@@ -173,6 +178,16 @@ curl -X POST http://localhost:8080/api/tools/fs/write \
 curl -X POST http://localhost:8080/api/tools/docker/action \
   -H "Content-Type: application/json" \
   -d '{"container": "nginx", "action": "restart"}'
+
+# Read only a specific function from a source file
+curl -X POST http://localhost:8080/api/tools/language/read_file \
+  -H "Content-Type: application/json" \
+  -d '{"path":"main.py","window":"function:run","format":"numbered"}'
+
+# Validate syntax + lint for a Python file
+curl -X POST http://localhost:8080/api/tools/language/validate \
+  -H "Content-Type: application/json" \
+  -d '{"path":"main.py","checks":["syntax","lint"]}'
 ```
 
 ### 4. Approve in Dashboard
@@ -245,7 +260,7 @@ ANYIDE_MODULES=all
 `ANYIDE_MODULES` supports:
 - `all` (default): load all built-in modules
 - `all,-docker,-http`: load all except listed modules
-- `fs,workspace,shell,git,memory,plan`: explicit allowlist
+- `fs,workspace,shell,git,memory,plan,language`: explicit allowlist
 
 ### Module Selection (`config.yaml`)
 
@@ -516,6 +531,18 @@ http://localhost:8080/admin/
 - `plan_cancel` - Cancel a pending or running plan
   - Prefer `plan_id` from `plan_create`; unique names are accepted when unambiguous
 
+### Language
+
+- `lang_read_file` - Read files with structural windows (`function:`, `class:`, `import:*`, `lines:`)
+- `lang_skeleton` - Return file structure (symbols/signatures) for one or more files
+- `lang_diff` - Generate function-anchored structural diffs with syntax validation
+- `lang_apply_patch` - Apply anchored patch hunks with fallback matching, backup, and validation
+- `lang_create_file` - Create a new code file with syntax/lint validation and symbol extraction
+- `lang_index` - Incrementally index workspace symbols into persistent SQLite tables
+- `lang_search_symbols` - Query indexed symbols by wildcard/name/kind/language
+- `lang_reference_graph` - Build baseline file/workspace function reference graph
+- `lang_validate` - Run syntax and language-routed lint checks
+
 ---
 
 ## Security
@@ -570,6 +597,11 @@ http://localhost:8080/admin/
 │       ├── fs/
 │       │   ├── module.py
 │       │   └── tools.py
+│       ├── language/
+│       │   ├── module.py
+│       │   ├── tools.py
+│       │   ├── treesitter.py
+│       │   └── schemas.py
 │       └── ...
 ├── admin/                 # React dashboard
 │   ├── src/
