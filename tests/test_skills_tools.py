@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from anyide.modules.skills.schemas import (
@@ -49,6 +51,26 @@ def skills_dir(tmp_path):
     plain.mkdir()
     (plain / "SKILL.md").write_text("# Plain Skill\nNo frontmatter.\n", encoding="utf-8")
 
+    agents_skill = base / ".agents" / "skills" / "ui-design-system"
+    agents_skill.mkdir(parents=True)
+    (agents_skill / "SKILL.md").write_text(
+        "\n".join(
+            [
+                "---",
+                "name: ui-design-system",
+                "description: Installed under .agents/skills layout",
+                "---",
+                "",
+                "# UI Design System",
+                "",
+                "## Usage",
+                "Use this for design system workflows.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
     return base
 
 
@@ -64,6 +86,7 @@ async def test_skills_list_reads_frontmatter(skills_tools: SkillsTools):
     names = [item.name for item in response.skills]
     assert "sample-skill" in names
     assert "plain-skill" in names
+    assert "ui-design-system" in names
 
     sample = next(item for item in response.skills if item.name == "sample-skill")
     assert sample.description == "Sample skill used in tests"
@@ -84,6 +107,15 @@ async def test_skills_read_section_and_metadata(skills_tools: SkillsTools):
     assert "helper.sh" in response.scripts
     assert response.has_references is True
     assert "guide.md" in response.references
+
+
+@pytest.mark.asyncio
+async def test_skills_read_resolves_agents_layout(skills_tools: SkillsTools):
+    response = await skills_tools.read(SkillsReadRequest(name="ui-design-system"))
+
+    assert response.name == "ui-design-system"
+    assert response.metadata.get("description") == "Installed under .agents/skills layout"
+    assert "UI Design System" in response.content
 
 
 @pytest.mark.asyncio
@@ -200,14 +232,25 @@ async def test_skills_install_returns_preview(
     monkeypatch: pytest.MonkeyPatch,
     skills_tools: SkillsTools,
 ):
-    async def fake_run(*_args, **_kwargs):
+    captured: dict[str, list[str]] = {}
+
+    async def fake_run(args, **_kwargs):
+        captured["args"] = list(args)
+        installed_dir = Path(skills_tools.base_dir) / ".agents" / "skills" / "new-skill"
+        installed_dir.mkdir(parents=True, exist_ok=True)
+        (installed_dir / "SKILL.md").write_text(
+            "# New Skill\nInstalled by test.\n",
+            encoding="utf-8",
+        )
         return ("installed", "", 0)
 
     monkeypatch.setattr(skills_tools, "_run_skills_cli", fake_run)
 
     response = await skills_tools.install(
-        SkillsInstallRequest(repo="vercel-labs/agent-skills", skill_name="sample-skill")
+        SkillsInstallRequest(repo="vercel-labs/agent-skills", skill_name="new-skill")
     )
     assert response.installed is True
-    assert response.skill_name == "sample-skill"
+    assert response.skill_name == "new-skill"
+    assert ".agents/skills/new-skill" in response.path
     assert len(response.skill_md_preview) > 0
+    assert "--global" not in captured["args"]

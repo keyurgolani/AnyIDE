@@ -87,6 +87,7 @@ For skills module operation modes:
 - Ensure a dedicated `./skills:/skills` volume mount exists in `docker-compose.yaml`.
 - Offline-capable tools: `skills_list`, `skills_read`, `skills_read_file`.
 - Network-required tools: `skills_search`, `skills_install` (HITL-gated).
+- `skills_install` runs in project scope and writes under mounted `/skills` (commonly `/skills/.agents/skills/<name>`).
 
 ### Workspace Information
 
@@ -436,7 +437,7 @@ curl -X POST http://localhost:8080/api/tools/language/validate \
 ### Offline-Capable Skill Reads
 
 **"List installed skills"**
-- Calls `skills_list` and reads local `/skills` only
+- Calls `skills_list` and reads local `/skills` (including `.agents/skills` installs)
 
 **"Read the SKILL.md for the vitest skill"**
 - Calls `skills_read` with `name: "vitest"`
@@ -454,6 +455,7 @@ curl -X POST http://localhost:8080/api/tools/language/validate \
 
 **"Install the vitest skill from vercel-labs/agent-skills"** (requires approval)
 - Calls `skills_install` (HITL-gated by default)
+- Install runs in project scope (no `--global`) so follow-up `skills_list`/`skills_read` can find the new skill immediately
 - Fails with a clear network/egress error if outbound access is blocked
 
 ### Curl Examples
@@ -481,6 +483,12 @@ curl -X POST http://localhost:8080/api/tools/skills/search \
 curl -X POST http://localhost:8080/api/tools/skills/install \
   -H "Content-Type: application/json" \
   -d '{"repo":"vercel-labs/agent-skills","skill_name":"vitest"}'
+
+# Verify installed skill is discoverable immediately
+curl -X POST http://localhost:8080/api/tools/skills/list
+curl -X POST http://localhost:8080/api/tools/skills/read \
+  -H "Content-Type: application/json" \
+  -d '{"name":"vitest"}'
 ```
 
 ## Secrets and HTTP Tools
@@ -868,11 +876,11 @@ As of this version, AnyIDE supports:
   - `lang_validate` - Run syntax and linter checks
 
 - **Skills Tools** (category: `skills`)
-  - `skills_list` - List locally installed skills from isolated `/skills` storage
+  - `skills_list` - List locally installed skills from isolated `/skills` storage (including `.agents/skills` installs)
   - `skills_read` - Read `SKILL.md` content (optional section extraction)
   - `skills_read_file` - Read scripts/references files within a skill directory
   - `skills_search` - Search remote skills registry (`npx skills find ... --json`)
-  - `skills_install` - Install skills from remote repo (HITL required; network egress needed)
+  - `skills_install` - Install skills from remote repo in project scope under `/skills` (HITL required; network egress needed)
 
 - **Plan Tools** (category: `plan`)
   - `plan_create` - Create a plan with DAG validation

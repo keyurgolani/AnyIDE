@@ -43,6 +43,23 @@ def seeded_skills_dir():
     with open(os.path.join(scripts_dir, "helper.sh"), "w", encoding="utf-8") as f:
         f.write("echo helper\n")
 
+    nested = os.path.join(TEST_SKILLS, ".agents", "skills", "ui-design-system")
+    os.makedirs(nested, exist_ok=True)
+    with open(os.path.join(nested, "SKILL.md"), "w", encoding="utf-8") as f:
+        f.write(
+            "\n".join(
+                [
+                    "---",
+                    "name: ui-design-system",
+                    "description: Skill installed under .agents/skills",
+                    "---",
+                    "",
+                    "# UI Design System",
+                    "",
+                ]
+            )
+        )
+
     return TEST_SKILLS
 
 
@@ -103,6 +120,7 @@ class TestSkillsAPI:
         assert list_resp.status_code == 200
         listed = list_resp.json()["skills"]
         assert any(item["name"] == "sample-skill" for item in listed)
+        assert any(item["name"] == "ui-design-system" for item in listed)
 
         read_resp = await client.post(
             "/api/tools/skills/read",
@@ -117,6 +135,13 @@ class TestSkillsAPI:
         )
         assert read_file_resp.status_code == 200
         assert "helper" in read_file_resp.json()["content"]
+
+        nested_read_resp = await client.post(
+            "/api/tools/skills/read",
+            json={"name": "ui-design-system"},
+        )
+        assert nested_read_resp.status_code == 200
+        assert "UI Design System" in nested_read_resp.json()["content"]
 
     @pytest.mark.asyncio
     async def test_skills_read_accepts_skill_id_alias(self, client):

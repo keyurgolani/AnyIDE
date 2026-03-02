@@ -50,6 +50,8 @@ Built-in admin dashboard provides human oversight, HITL (Human-in-the-Loop) appr
 - **Skills Module:** Isolated `/skills` storage and skills.sh integration
   - Offline-capable local tools: `skills_list`, `skills_read`, `skills_read_file`
   - Online tools: `skills_search` (`npx skills find ... --json`) and HITL-gated `skills_install`
+  - `skills_install` uses project-scope installs under `/skills` (commonly `/skills/.agents/skills/<name>`)
+  - `skills_list/read/read_file` discover skills from both `/skills/<name>` and `/skills/.agents/skills/<name>`
   - Robust CLI parsing/error normalization (JSON + ANSI/plaintext fallback for search output)
 - **Workspace Management:** Secure path resolution and boundary enforcement
 - **HITL System:** Real-time approval workflow for sensitive operations
@@ -300,8 +302,9 @@ skills:
 ```
 
 - `skills.base_dir` is isolated from workspace paths and should be mounted as a separate volume.
-- Offline mode: `skills_list`, `skills_read`, and `skills_read_file` work from local `/skills` content.
+- Offline mode: `skills_list`, `skills_read`, and `skills_read_file` work from local `skills.base_dir` content, including `.agents/skills` installs.
 - Online mode: `skills_search` and `skills_install` require outbound network access.
+- `skills_install` runs in project scope (no `--global`) so installed skills remain under mounted `/skills` storage.
 - `skills_install` is HITL-gated by default because it downloads and executes external code.
 
 ### LLM Endpoints (`config.yaml`)
@@ -583,7 +586,7 @@ http://localhost:8080/admin/
 - `skills_read` - Read `SKILL.md` content with optional section extraction
 - `skills_read_file` - Read scripts/references files within an installed skill directory
 - `skills_search` - Search remote skills registry using `npx skills find ... --json`
-- `skills_install` - Install skills from remote repos (HITL-gated; requires network egress)
+- `skills_install` - Install skills from remote repos in project scope under `/skills` (HITL-gated; requires network egress)
 
 ---
 

@@ -50,7 +50,7 @@ If remote search is unavailable, fall back to local workflows:
 
 _INSTALL_DESC = """Install a skill from a remote repository using the skills CLI.
 
-Runs `npx skills add <repo> [--skill <name>] --global -y`.
+Runs `npx skills add <repo> [--skill <name>] -y` in project scope.
 Request body fields:
 - `repo`: source repository (for example `vercel-labs/agent-skills`)
 - `skill_name` (or alias `skill_id`): optional skill within that repo

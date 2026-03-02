@@ -45,41 +45,49 @@ class SkillsTools:
     )
 
     def __init__(self, base_dir: str = "/skills", cli_timeout: int = 180):
-        self.base_dir = str(Path(base_dir).resolve())
+        self.base_dir_path = Path(base_dir).resolve()
+        self.base_dir = str(self.base_dir_path)
         self.cli_timeout = cli_timeout
 
     async def list(self) -> SkillsListResponse:
         """List installed skills from the dedicated skills directory."""
-        base = Path(self.base_dir)
-        if not base.exists():
+        roots = self._skills_roots()
+        if not any(root.exists() for root in roots):
             return SkillsListResponse(skills=[], total=0)
 
-        skills: list[SkillsListItem] = []
-        for entry in sorted(base.iterdir(), key=lambda item: item.name.lower()):
-            if not entry.is_dir():
+        by_name: dict[str, SkillsListItem] = {}
+        for root in roots:
+            if not root.exists() or not root.is_dir():
                 continue
-            skill_md = entry / "SKILL.md"
-            if not skill_md.is_file():
-                continue
+            for entry in sorted(root.iterdir(), key=lambda item: item.name.lower()):
+                if not entry.is_dir():
+                    continue
+                skill_md = entry / "SKILL.md"
+                if not skill_md.is_file():
+                    continue
 
-            metadata, _ = self._read_skill_markdown(skill_md)
-            description = str(metadata.get("description", "")) if isinstance(metadata, dict) else ""
-            size_bytes = skill_md.stat().st_size
-            installed_at = datetime.fromtimestamp(
-                entry.stat().st_mtime,
-                tz=timezone.utc,
-            ).isoformat()
-
-            skills.append(
-                SkillsListItem(
-                    name=entry.name,
-                    path=str(entry),
-                    description=description,
-                    size_bytes=size_bytes,
-                    installed_at=installed_at,
+                metadata, _ = self._read_skill_markdown(skill_md)
+                description = (
+                    str(metadata.get("description", "")) if isinstance(metadata, dict) else ""
                 )
-            )
+                size_bytes = skill_md.stat().st_size
+                installed_at = datetime.fromtimestamp(
+                    entry.stat().st_mtime,
+                    tz=timezone.utc,
+                ).isoformat()
 
+                by_name.setdefault(
+                    entry.name,
+                    SkillsListItem(
+                        name=entry.name,
+                        path=str(entry),
+                        description=description,
+                        size_bytes=size_bytes,
+                        installed_at=installed_at,
+                    ),
+                )
+
+        skills = sorted(by_name.values(), key=lambda item: item.name.lower())
         return SkillsListResponse(skills=skills, total=len(skills))
 
     async def read(self, request: SkillsReadRequest) -> SkillsReadResponse:
@@ -179,7 +187,7 @@ class SkillsTools:
 
     async def install(self, request: SkillsInstallRequest) -> SkillsInstallResponse:
         """Install a skill via `npx skills add`."""
-        args = ["skills", "add", request.repo, "--global", "-y"]
+        args = ["skills", "add", request.repo, "-y"]
         if request.skill_name:
             args.extend(["--skill", request.skill_name])
 
@@ -208,38 +216,41 @@ class SkillsTools:
         if not normalized:
             raise ValueError(f"Skill name cannot be empty. {self.SKILL_NAME_GUIDANCE}")
 
-        skill_dir = (Path(self.base_dir) / normalized).resolve()
-        if not self._is_within(skill_dir, Path(self.base_dir)):
-            raise ValueError(
-                "Skill path resolves outside skills directory. "
-                f"{self.SKILL_NAME_GUIDANCE}"
-            )
-        if not skill_dir.exists() or not skill_dir.is_dir():
-            raise FileNotFoundError(
-                f"Skill not found: {normalized}. "
-                "Call skills_list to discover valid installed skill names."
-            )
-        if not (skill_dir / "SKILL.md").is_file():
-            raise FileNotFoundError(f"SKILL.md not found for skill '{normalized}'")
-        return skill_dir
+        for root in self._skills_roots():
+            skill_dir = (root / normalized).resolve()
+            if not self._is_within(skill_dir, root):
+                continue
+            if not skill_dir.exists() or not skill_dir.is_dir():
+                continue
+            if not (skill_dir / "SKILL.md").is_file():
+                continue
+            return skill_dir
+
+        raise FileNotFoundError(
+            f"Skill not found: {normalized}. "
+            "Call skills_list to discover valid installed skill names."
+        )
 
     def _resolve_installed_skill_dir(self, requested_skill_name: str | None) -> Path:
-        base = Path(self.base_dir)
+        roots = self._skills_roots()
         if requested_skill_name:
-            candidate = (base / requested_skill_name).resolve()
-            if self._is_within(candidate, base) and (candidate / "SKILL.md").is_file():
-                return candidate
+            for root in roots:
+                candidate = (root / requested_skill_name).resolve()
+                if self._is_within(candidate, root) and (candidate / "SKILL.md").is_file():
+                    return candidate
 
-        if not base.exists() or not base.is_dir():
+        if not any(root.exists() and root.is_dir() for root in roots):
             raise FileNotFoundError(
                 f"skills base directory does not exist or is not readable: {self.base_dir}"
             )
 
-        candidates = [
-            item
-            for item in base.iterdir()
-            if item.is_dir() and (item / "SKILL.md").is_file()
-        ]
+        candidates: list[Path] = []
+        for root in roots:
+            if not root.exists() or not root.is_dir():
+                continue
+            candidates.extend(
+                item for item in root.iterdir() if item.is_dir() and (item / "SKILL.md").is_file()
+            )
         if not candidates:
             raise FileNotFoundError(
                 "skills install completed but no installed SKILL.md was found under /skills"
@@ -423,6 +434,23 @@ class SkillsTools:
 
     def _strip_ansi(self, text: str) -> str:
         return self.ANSI_ESCAPE_RE.sub("", text)
+
+    def _skills_roots(self) -> list[Path]:
+        base = self.base_dir_path
+        roots: list[Path] = [base]
+        is_agents_skills_dir = base.name == "skills" and base.parent.name == ".agents"
+        if not is_agents_skills_dir:
+            roots.append(base / ".agents" / "skills")
+
+        deduped: list[Path] = []
+        seen: set[str] = set()
+        for root in roots:
+            key = str(root)
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(root)
+        return deduped
 
     def _list_markdown_headings(self, markdown: str) -> list[str]:
         headings: list[str] = []
