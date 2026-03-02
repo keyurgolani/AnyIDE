@@ -83,6 +83,52 @@ ANYIDE_MODULES=fs,workspace,shell,git,memory,plan,language,skills,subagent docke
 
 If `jq` is not installed, save `openapi.json` and inspect it manually.
 
+### Release Readiness Validation
+
+Use these commands to run the release validation gates end-to-end:
+
+```bash
+# Module matrix + dependency-edge integration checks
+venv/bin/pytest tests/test_module_matrix_integration.py tests/test_module_registry.py -q
+
+# Full regression suite
+venv/bin/pytest
+
+# Risk-targeted suites
+venv/bin/pytest tests/test_security.py -v
+venv/bin/pytest tests/test_integration.py -v
+venv/bin/pytest tests/test_load.py -v
+
+# Buildx validation (loads image locally)
+docker buildx build --platform linux/amd64 --load -t hostbridge:anyide-release-check .
+
+# Clean deployment smoke
+docker compose down --remove-orphans
+docker compose up -d --build
+curl -fsS http://localhost:8080/health
+curl -fsS http://localhost:8080/openapi.json > /tmp/openapi.json
+
+# Published image smoke (Docker Hub)
+mkdir -p /tmp/anyide-smoke/{workspace,data,secrets,skills}
+docker pull keyurgolani/anyide:latest
+docker run -d --name anyide-release-smoke \
+  -p 18080:8080 \
+  -e ADMIN_PASSWORD=test \
+  -e WORKSPACE_BASE_DIR=/workspace \
+  -v /tmp/anyide-smoke/workspace:/workspace \
+  -v /tmp/anyide-smoke/data:/data \
+  -v /tmp/anyide-smoke/secrets:/secrets \
+  -v /tmp/anyide-smoke/skills:/skills \
+  keyurgolani/anyide:latest
+curl -fsS http://localhost:18080/health
+curl -fsS http://localhost:18080/openapi.json > /tmp/anyide-openapi-smoke.json
+curl -s -X POST http://localhost:18080/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"jsonrpc":"2.0","id":"init","method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"1.0"}}}'
+docker rm -f anyide-release-smoke
+```
+
 For skills module operation modes:
 - Ensure a dedicated `./skills:/skills` volume mount exists in `docker-compose.yaml`.
 - Offline-capable tools: `skills_list`, `skills_read`, `skills_read_file`.

@@ -144,6 +144,7 @@ jobs:
      -v ./workspace:/workspace \
      -v ./data:/data \
      -e ADMIN_PASSWORD=your_password \
+     -e WORKSPACE_BASE_DIR=/workspace \
      keyurgolani/anyide:latest
    ```
 
@@ -213,8 +214,26 @@ After publishing, verify the image:
 docker pull keyurgolani/anyide:latest
 
 # Run and test
-docker run -d -p 8080:8080 -e ADMIN_PASSWORD=test keyurgolani/anyide:latest
+docker run -d \
+  --name anyide-verify \
+  -p 8080:8080 \
+  -e ADMIN_PASSWORD=test \
+  -e WORKSPACE_BASE_DIR=/workspace \
+  -v ./workspace:/workspace \
+  -v ./data:/data \
+  -v ./secrets:/secrets \
+  -v ./skills:/skills \
+  keyurgolani/anyide:latest
 
 # Check health
 curl http://localhost:8080/health
+
+# Optional: quick MCP initialize check (requires explicit Accept header)
+curl -X POST http://localhost:8080/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"jsonrpc":"2.0","id":"init","method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"verify","version":"1.0"}}}'
+
+# Cleanup
+docker rm -f anyide-verify
 ```

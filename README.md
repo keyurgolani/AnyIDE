@@ -800,6 +800,8 @@ npm run dev
 - **Tool Catalog:** `docs/TOOL_CATALOG.md` - Auto-generated endpoint and MCP tool reference
 - **LLM Prompt Template:** `docs/LLM_SYSTEM_PROMPT.md` - Starter system prompt for AnyIDE-connected assistants
 - **Docker Publishing Guide:** `docs/DOCKER_HUB_PUBLISHING.md` - Build/tag/publish workflow
+- **Scaling Notes:** `docs/SCALING.md` - Vertical/horizontal scaling paths and module decomposition guidance
+- **Release Baseline:** `docs/RELEASE_BASELINE.md` - Recorded regression and smoke-check metrics for release readiness
 - **Deployment Examples:** `examples/` - `config.basic.yaml`, `config.development.yaml`, `config.restricted.yaml`, and production compose template
 - **API Documentation:** http://localhost:8080/docs - Interactive OpenAPI docs
 - **Regenerate Tool Catalog:** `python3 scripts/generate_tool_docs.py > docs/TOOL_CATALOG.md`
@@ -833,7 +835,7 @@ npm run dev
 - DAG plan orchestration with ready-task snapshots, task references, and configurable failure policies.
 
 ### Test Coverage Snapshot
-- `pytest --collect-only -q` reports 505 backend tests.
+- `pytest --collect-only -q` reports 509 backend tests.
 - Memory tool suite: 48 tests.
 - Plan orchestration suite: 22 tests.
 - HITL WebSocket roundtrip tests: 7 tests.
