@@ -78,7 +78,7 @@ curl -s http://localhost:8080/openapi.json | jq '.paths | keys[]' | grep '/api/t
 curl -s http://localhost:8080/openapi.json | jq '.paths | keys[]' | grep '/api/tools/http/' || true
 
 # Start with an explicit allowlist
-ANYIDE_MODULES=fs,workspace,shell,git,memory,plan,language,skills docker compose up -d --build
+ANYIDE_MODULES=fs,workspace,shell,git,memory,plan,language,skills,subagent docker compose up -d --build
 ```
 
 If `jq` is not installed, save `openapi.json` and inspect it manually.
@@ -491,6 +491,42 @@ curl -X POST http://localhost:8080/api/tools/skills/read \
   -d '{"name":"vitest"}'
 ```
 
+## Subagent Module
+
+Subagents are configured in `config.yaml` under `subagents.types` and executed as single-turn specialist prompts through the shared LLM client.
+
+### Discovery and Execution
+
+**"List all configured subagent types"**
+- Calls `subagent_list` and returns type IDs, endpoint bindings, and configured model overrides
+
+**"Run the prompt optimizer subagent on this draft prompt"**
+- Calls `subagent_run` with `type`, `input`, and optional `context`
+- Returns model/endpoint used, usage, latency, and generated response
+
+**"Try overriding the model for this subagent run"**
+- Uses `override_model`; succeeds only when that type enables `allow_model_override`
+
+**"Try overriding temperature for this subagent run"**
+- Uses `override_temperature`; succeeds only when that type enables `allow_temperature_override`
+
+### Curl Examples
+
+```bash
+# List configured subagent types
+curl -X POST http://localhost:8080/api/tools/subagent/list
+
+# Execute a configured subagent type
+curl -X POST http://localhost:8080/api/tools/subagent/run \
+  -H "Content-Type: application/json" \
+  -d '{"type":"prompt_optimizer","input":"Improve this prompt","context":"Audience: backend engineers"}'
+
+# Example: model override (requires allow_model_override=true in config)
+curl -X POST http://localhost:8080/api/tools/subagent/run \
+  -H "Content-Type: application/json" \
+  -d '{"type":"prompt_optimizer","input":"Improve this prompt","override_model":"gpt-4o-mini"}'
+```
+
 ## Secrets and HTTP Tools
 
 ### Secret Templates
@@ -882,6 +918,12 @@ As of this version, AnyIDE supports:
   - `skills_search` - Search remote skills registry (`npx skills find ... --json`)
   - `skills_install` - Install skills from remote repo in project scope under `/skills` (HITL required; network egress needed)
 
+- **Subagent Tools** (category: `subagent`)
+  - `subagent_list` - List configured subagent types from `subagents.types`
+  - `subagent_run` - Execute a single-turn configured subagent prompt via the LLM client
+    - Supports optional `override_model` and `override_temperature` when enabled per type
+    - Returns `model_used`, `endpoint_used`, `usage`, `latency_ms`, and `response`
+
 - **Plan Tools** (category: `plan`)
   - `plan_create` - Create a plan with DAG validation
     - Validates task dependencies, detects cycles via Kahn's algorithm
@@ -943,6 +985,8 @@ When using MCP clients (Claude Desktop, Cursor, etc.), tools are identified by t
 - `skills_read_file` - Read files inside skill directories
 - `skills_search` - Search remote skills registry
 - `skills_install` - Install remote skills (HITL-gated)
+- `subagent_list` - List configured subagent types
+- `subagent_run` - Run a configured subagent
 - `memory_store` - Store a knowledge node
 - `memory_get` - Retrieve a node with its relationships
 - `memory_search` - Full-text search across knowledge graph
@@ -1005,6 +1049,8 @@ When using REST API directly:
 - `POST /api/tools/skills/read_file` - Read a specific skill file
 - `POST /api/tools/skills/search` - Search remote skills registry
 - `POST /api/tools/skills/install` - Install skill from remote repo (HITL-gated)
+- `POST /api/tools/subagent/list` - List configured subagent types
+- `POST /api/tools/subagent/run` - Execute a configured subagent
 - `POST /api/tools/memory/store` - Store a knowledge node
 - `POST /api/tools/memory/get` - Retrieve a node with relations
 - `POST /api/tools/memory/search` - Full-text search knowledge graph

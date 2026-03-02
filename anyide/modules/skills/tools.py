@@ -45,9 +45,18 @@ class SkillsTools:
     )
 
     def __init__(self, base_dir: str = "/skills", cli_timeout: int = 180):
-        self.base_dir_path = Path(base_dir).resolve()
-        self.base_dir = str(self.base_dir_path)
+        self.base_dir = base_dir
         self.cli_timeout = cli_timeout
+
+    @property
+    def base_dir(self) -> str:
+        return self._base_dir
+
+    @base_dir.setter
+    def base_dir(self, value: str) -> None:
+        resolved = Path(value).resolve()
+        self.base_dir_path = resolved
+        self._base_dir = str(resolved)
 
     async def list(self) -> SkillsListResponse:
         """List installed skills from the dedicated skills directory."""

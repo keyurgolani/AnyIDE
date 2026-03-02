@@ -56,6 +56,7 @@ docker_tools = None
 http_tools = None
 memory_tools = None
 plan_tools = None
+subagent_tools = None
 
 module_context: ModuleContext | None = None
 module_registry: ModuleRegistry | None = None
@@ -632,6 +633,7 @@ def _bind_compat_tool_globals() -> None:
     global http_tools
     global memory_tools
     global plan_tools
+    global subagent_tools
 
     modules = module_registry.modules if module_registry is not None else {}
     fs_tools = getattr(modules.get("fs"), "fs_tools", None)
@@ -642,6 +644,7 @@ def _bind_compat_tool_globals() -> None:
     http_tools = getattr(modules.get("http"), "http_tools", None)
     memory_tools = getattr(modules.get("memory"), "memory_tools", None)
     plan_tools = getattr(modules.get("plan"), "plan_tools", None)
+    subagent_tools = getattr(modules.get("subagent"), "subagent_tools", None)
 
 
 _bind_compat_tool_globals()

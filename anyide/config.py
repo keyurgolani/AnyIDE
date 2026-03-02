@@ -99,6 +99,63 @@ class LanguageConfig(BaseModel):
     )
 
 
+class SubagentTypeConfig(BaseModel):
+    """Configuration for a single subagent type."""
+
+    display_name: str = Field(..., description="Human-readable subagent name")
+    description: str = Field("", description="Subagent description")
+    llm_endpoint: str = Field(..., description="Configured LLM endpoint id")
+    model: Optional[str] = Field(None, description="Optional model override for this type")
+    temperature: Optional[float] = Field(None, ge=0, le=2)
+    max_tokens: Optional[int] = Field(None, ge=1)
+    system_prompt_file: str = Field(..., description="Prompt template file path")
+    response_format: Optional[Literal["json"]] = Field(
+        None,
+        description="Optional structured response mode",
+    )
+    allow_model_override: bool = Field(
+        False,
+        description="Whether callers can override the configured model",
+    )
+    allow_temperature_override: bool = Field(
+        False,
+        description="Whether callers can override the configured temperature",
+    )
+
+    @field_validator("display_name", "description", "llm_endpoint", "system_prompt_file")
+    @classmethod
+    def _normalize_text_fields(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("display_name", "llm_endpoint", "system_prompt_file")
+    @classmethod
+    def _must_not_be_blank(cls, value: str) -> str:
+        if not value:
+            raise ValueError("must not be blank")
+        return value
+
+    @field_validator("model")
+    @classmethod
+    def _normalize_model(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        trimmed = value.strip()
+        return trimmed or None
+
+
+class SubagentsConfig(BaseModel):
+    """Subagent module configuration."""
+
+    types: Dict[str, SubagentTypeConfig] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _validate_type_ids(self) -> "SubagentsConfig":
+        invalid = [type_id for type_id in self.types if not type_id.strip()]
+        if invalid:
+            raise ValueError("subagents type ids must not be blank")
+        return self
+
+
 class LLMEndpointConfig(BaseModel):
     """LLM endpoint configuration."""
 
@@ -177,6 +234,7 @@ class ToolsConfig(BaseModel):
     http: Dict[str, ToolPolicyConfig] = Field(default_factory=dict)
     language: Dict[str, ToolPolicyConfig] = Field(default_factory=dict)
     skills: Dict[str, ToolPolicyConfig] = Field(default_factory=dict)
+    subagent: Dict[str, ToolPolicyConfig] = Field(default_factory=dict)
 
 
 class Config(BaseModel):
@@ -191,6 +249,7 @@ class Config(BaseModel):
     http: HttpConfig = Field(default_factory=HttpConfig)
     modules: ModulesConfig = Field(default_factory=ModulesConfig)
     skills: SkillsConfig = Field(default_factory=SkillsConfig)
+    subagents: SubagentsConfig = Field(default_factory=SubagentsConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     language: LanguageConfig = Field(default_factory=LanguageConfig)
 

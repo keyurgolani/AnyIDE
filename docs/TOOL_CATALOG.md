@@ -1480,6 +1480,201 @@ Allowlisted commands: ls, cat, echo, pwd, git, python, node, npm, docker, curl, 
 
 ---
 
+## SKILLS Tools
+
+### install
+
+**Endpoint:** `POST /api/tools/skills/install`
+
+
+**Summary:** Install Skill
+
+
+**Description:**
+
+Install a skill from a remote repository using the skills CLI.
+
+Runs `npx skills add <repo> [--skill <name>] -y` in project scope.
+Request body fields:
+- `repo`: source repository (for example `vercel-labs/agent-skills`)
+- `skill_name` (or alias `skill_id`): optional skill within that repo
+
+This operation is HITL-gated by default because it downloads and executes external code.
+
+
+**Request Body:**
+
+
+**Responses:**
+
+- **200:** Successful Response
+- **422:** Validation Error
+
+---
+
+### list
+
+**Endpoint:** `POST /api/tools/skills/list`
+
+
+**Summary:** List Installed Skills
+
+
+**Description:**
+
+List all installed skills from the isolated /skills directory.
+
+This tool is offline-capable and only reads local files.
+No workspace path resolution is used.
+
+Use `skills_list` first before `skills_read` or `skills_read_file` so the model has a valid skill name.
+
+
+**Responses:**
+
+- **200:** Successful Response
+
+---
+
+### read
+
+**Endpoint:** `POST /api/tools/skills/read`
+
+
+**Summary:** Read Skill File
+
+
+**Description:**
+
+Read a skill's SKILL.md content.
+
+Use `skills_list` first, then call `skills_read` with `name`.
+Compatibility aliases are accepted: `skill_id`, `skill_name`.
+
+Optional `section` allows extracting a specific markdown section by header text.
+
+
+**Request Body:**
+
+
+**Responses:**
+
+- **200:** Successful Response
+- **422:** Validation Error
+
+---
+
+### read_file
+
+**Endpoint:** `POST /api/tools/skills/read_file`
+
+
+**Summary:** Read Skill Nested File
+
+
+**Description:**
+
+Read a specific file inside an installed skill directory.
+
+Use `skills_list` first and pass the selected skill as `name`
+(compatibility aliases: `skill_id`, `skill_name`).
+
+The provided `file_path` must be a relative path and resolve within the selected skill directory.
+
+
+**Request Body:**
+
+
+**Responses:**
+
+- **200:** Successful Response
+- **422:** Validation Error
+
+---
+
+### search
+
+**Endpoint:** `POST /api/tools/skills/search`
+
+
+**Summary:** Search Skills Registry
+
+
+**Description:**
+
+Search available skills using the skills CLI registry.
+
+Runs `npx skills find <query> --json` and parses structured results.
+Requires outbound network access.
+
+If remote search is unavailable, fall back to local workflows:
+`skills_list` -> `skills_read` -> `skills_read_file`.
+
+
+**Request Body:**
+
+
+**Responses:**
+
+- **200:** Successful Response
+- **422:** Validation Error
+
+---
+
+## SUBAGENT Tools
+
+### list
+
+**Endpoint:** `POST /api/tools/subagent/list`
+
+
+**Summary:** List Subagent Types
+
+
+**Description:**
+
+List configured subagent types from `config.subagents.types`.
+
+Use this before `subagent_run` to discover valid type IDs and endpoint/model bindings.
+
+
+**Responses:**
+
+- **200:** Successful Response
+
+---
+
+### run
+
+**Endpoint:** `POST /api/tools/subagent/run`
+
+
+**Summary:** Run Subagent
+
+
+**Description:**
+
+Run one configured subagent task as a single LLM completion.
+
+Execution flow:
+1. Load subagent type config
+2. Read and render system prompt template
+3. Call unified LLM client with configured endpoint/model defaults
+4. Return response plus metadata (latency/usage/model/endpoint)
+
+`override_model` and `override_temperature` are only accepted when enabled for that subagent type.
+
+
+**Request Body:**
+
+
+**Responses:**
+
+- **200:** Successful Response
+- **422:** Validation Error
+
+---
+
 ## WORKSPACE Tools
 
 ### info
@@ -1594,5 +1789,12 @@ When using MCP clients, tools are identified by their operation IDs:
 - `plan_status` - plan/status
 - `plan_update_task` - plan/update_task
 - `shell_execute` - shell/execute
+- `skills_install` - skills/install
+- `skills_list` - skills/list
+- `skills_read` - skills/read
+- `skills_read_file` - skills/read_file
+- `skills_search` - skills/search
+- `subagent_list` - subagent/list
+- `subagent_run` - subagent/run
 - `workspace_info` - workspace/info
 - `workspace_secrets_list` - workspace/secrets

@@ -750,7 +750,7 @@ async def get_config(session_token: str = Depends(require_auth)):
 
     tool_configs = {}
     if hasattr(config, 'tools'):
-        for tool_name in ['fs', 'workspace', 'shell', 'git', 'docker', 'http', 'memory', 'plan', 'language', 'skills']:
+        for tool_name in ['fs', 'workspace', 'shell', 'git', 'docker', 'http', 'memory', 'plan', 'language', 'skills', 'subagent']:
             tool_cfg = getattr(config.tools, tool_name, None)
             if tool_cfg:
                 tool_configs[tool_name] = {

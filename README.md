@@ -53,6 +53,12 @@ Built-in admin dashboard provides human oversight, HITL (Human-in-the-Loop) appr
   - `skills_install` uses project-scope installs under `/skills` (commonly `/skills/.agents/skills/<name>`)
   - `skills_list/read/read_file` discover skills from both `/skills/<name>` and `/skills/.agents/skills/<name>`
   - Robust CLI parsing/error normalization (JSON + ANSI/plaintext fallback for search output)
+- **Subagent Module:** Config-driven specialist subagents backed by the unified LLM client
+  - `subagent_list` discovers configured subagent types
+  - `subagent_run` executes single-turn prompt templates with endpoint/model selection
+  - Response metadata includes model, endpoint, token usage, latency, and configured JSON mode
+  - Per-type override controls gate `override_model` and `override_temperature`
+  - Policy integration supports allow/block/HITL controls for `subagent_list` and `subagent_run`
 - **Workspace Management:** Secure path resolution and boundary enforcement
 - **HITL System:** Real-time approval workflow for sensitive operations
 - **Admin Dashboard:** Premium UI with real-time updates
@@ -207,6 +213,14 @@ curl -X POST http://localhost:8080/api/tools/skills/search \
 curl -X POST http://localhost:8080/api/tools/skills/install \
   -H "Content-Type: application/json" \
   -d '{"repo":"vercel-labs/agent-skills","skill_name":"vitest"}'
+
+# List configured subagent types
+curl -X POST http://localhost:8080/api/tools/subagent/list
+
+# Run a configured subagent
+curl -X POST http://localhost:8080/api/tools/subagent/run \
+  -H "Content-Type: application/json" \
+  -d '{"type":"prompt_optimizer","input":"Improve this prompt","context":"Audience: backend engineers"}'
 ```
 
 ### 4. Approve in Dashboard
@@ -282,7 +296,7 @@ ANYIDE_HOST_SKILLS_DIR=./skills
 `ANYIDE_MODULES` supports:
 - `all` (default): load all built-in modules
 - `all,-docker,-http`: load all except listed modules
-- `fs,workspace,shell,git,memory,plan,language,skills`: explicit allowlist
+- `fs,workspace,shell,git,memory,plan,language,skills,subagent`: explicit allowlist
 
 ### Module Selection (`config.yaml`)
 
@@ -325,6 +339,26 @@ llm:
 Admin-only LLM APIs:
 - `GET /admin/api/llm/endpoints` (sanitized endpoint list)
 - `POST /admin/api/llm/test` (connectivity test for one endpoint)
+
+### Subagents (`config.yaml`)
+
+Subagent types are configured in `subagents.types` and executed through `subagent_run`.
+
+```yaml
+subagents:
+  types:
+    prompt_optimizer:
+      display_name: "Prompt Optimizer"
+      description: "Improve prompts for clarity and constraints"
+      llm_endpoint: "primary"
+      model: "gpt-4o-mini"             # optional (falls back to endpoint default)
+      temperature: 0.3                 # optional
+      max_tokens: 2048                 # optional
+      system_prompt_file: "prompts/prompt_optimizer.md"
+      response_format: null            # or "json"
+      allow_model_override: false
+      allow_temperature_override: false
+```
 
 ### Secrets File
 
@@ -588,6 +622,14 @@ http://localhost:8080/admin/
 - `skills_search` - Search remote skills registry using `npx skills find ... --json`
 - `skills_install` - Install skills from remote repos in project scope under `/skills` (HITL-gated; requires network egress)
 
+### Subagent
+
+- `subagent_list` - List configured subagent types from `config.yaml`
+- `subagent_run` - Execute a configured single-turn subagent via the unified LLM client
+  - Prompt template loading and `{{input}}` / `{{context}}` substitution
+  - Per-type controls for `override_model` and `override_temperature`
+  - Response metadata includes `endpoint_used`, `model_used`, `latency_ms`, and `usage`
+
 ---
 
 ## Security
@@ -651,6 +693,11 @@ http://localhost:8080/admin/
 │       │   ├── module.py
 │       │   ├── tools.py
 │       │   └── schemas.py
+│       ├── subagent/
+│       │   ├── module.py
+│       │   ├── tools.py
+│       │   ├── schemas.py
+│       │   └── prompts/
 │       └── ...
 ├── admin/                 # React dashboard
 │   ├── src/
@@ -689,24 +736,24 @@ npm run test
 
 ```bash
 # Run all tests
-pytest
+./venv/bin/pytest
 
 # Run specific test file
-pytest tests/test_mcp.py
+./venv/bin/pytest tests/test_mcp.py
 
 # Run integration/security/load suites
-pytest tests/test_integration.py -v
-pytest tests/test_security.py -v
-pytest tests/test_load.py -v
+./venv/bin/pytest tests/test_integration.py -v
+./venv/bin/pytest tests/test_security.py -v
+./venv/bin/pytest tests/test_load.py -v
 
 # Run with coverage
-pytest --cov=src --cov-report=html
+./venv/bin/pytest --cov=anyide --cov-report=html
 
 # Run with verbose output
-pytest -v
+./venv/bin/pytest -v
 
 # Collect test inventory
-pytest --collect-only -q
+./venv/bin/pytest --collect-only -q
 ```
 
 ### Run Locally (Development)
@@ -757,17 +804,18 @@ npm run dev
 - Dashboard API/WebSocket clients support reverse-proxy path prefixes.
 
 ### Tooling
-- Filesystem, shell, git, docker, workspace, HTTP, language, and skills tool categories.
+- Filesystem, shell, git, docker, workspace, HTTP, language, skills, and subagent tool categories.
 - Memory graph tooling with full-text search and relationship traversal.
 - DAG plan orchestration with ready-task snapshots, task references, and configurable failure policies.
 
 ### Test Coverage Snapshot
-- `pytest --collect-only -q` reports 481 backend tests.
+- `pytest --collect-only -q` reports 496 backend tests.
 - Memory tool suite: 48 tests.
 - Plan orchestration suite: 22 tests.
 - HITL WebSocket roundtrip tests: 7 tests.
 - Tool Explorer contract tests: 13 tests.
 - LLM endpoint/config coverage: config validation + client/adapter normalization + admin endpoint behavior.
+- Subagent API coverage: module registration, run path, override controls, and failure mapping.
 - Frontend admin auth/session tests run with Vitest + jsdom.
 
 ---

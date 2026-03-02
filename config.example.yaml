@@ -32,6 +32,9 @@ modules:
 skills:
   base_dir: "/skills"
 
+subagents:
+  types: {}
+
 language:
   linters:
     python: "ruff"
@@ -107,6 +110,12 @@ tools:
       policy: "allow"
     install:
       policy: "hitl"
+
+  subagent:
+    list:
+      policy: "allow"
+    run:
+      policy: "allow"
       
   docker:
     list:
