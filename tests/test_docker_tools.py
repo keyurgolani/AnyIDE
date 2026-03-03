@@ -2,7 +2,6 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
 
 from anyide.modules.docker.tools import DockerTools, DOCKER_AVAILABLE
 from anyide.models import (

@@ -9,15 +9,8 @@ These tests verify the entire system works end-to-end, including:
 - Admin dashboard API
 """
 
-import asyncio
-import json
 import os
 import tempfile
-import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import AsyncClient, ASGITransport
@@ -69,8 +62,9 @@ async def auth_headers(client):
         json={"password": "admin"}
     )
     assert response.status_code == 200
-    cookies = response.cookies
-    return cookies
+    for key, value in response.cookies.items():
+        client.cookies.set(key, value)
+    return response.cookies
 
 
 class TestHealthEndpoints:
@@ -217,7 +211,7 @@ class TestAdminAPI:
     @pytest.mark.asyncio
     async def test_system_health(self, client, auth_headers):
         """Test system health endpoint."""
-        response = await client.get("/admin/api/health", cookies=auth_headers)
+        response = await client.get("/admin/api/health")
         assert response.status_code == 200
         data = response.json()
         assert "uptime" in data
@@ -226,7 +220,7 @@ class TestAdminAPI:
     @pytest.mark.asyncio
     async def test_detailed_health(self, client, auth_headers):
         """Test detailed health endpoint."""
-        response = await client.get("/admin/api/health/detailed", cookies=auth_headers)
+        response = await client.get("/admin/api/health/detailed")
         assert response.status_code == 200
         data = response.json()
         assert "cpu_percent" in data
@@ -235,7 +229,7 @@ class TestAdminAPI:
     @pytest.mark.asyncio
     async def test_tool_explorer(self, client, auth_headers):
         """Test tool explorer endpoint."""
-        response = await client.get("/admin/api/tools", cookies=auth_headers)
+        response = await client.get("/admin/api/tools")
         assert response.status_code == 200
         data = response.json()
         assert "tools" in data
@@ -244,7 +238,7 @@ class TestAdminAPI:
     @pytest.mark.asyncio
     async def test_config_viewer(self, client, auth_headers):
         """Test configuration viewer endpoint."""
-        response = await client.get("/admin/api/config", cookies=auth_headers)
+        response = await client.get("/admin/api/config")
         assert response.status_code == 200
         data = response.json()
         assert "auth_enabled" in data

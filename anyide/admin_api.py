@@ -4,10 +4,8 @@ import json
 import os
 import platform
 import psutil
-import shutil
 import time
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Response, Cookie, Depends, Header
@@ -15,7 +13,6 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from anyide.config import Config
-from anyide.core.audit import AuditLogger
 from anyide.logging_config import get_logger
 from anyide.models import DockerListRequest, DockerLogsRequest
 
@@ -316,7 +313,7 @@ async def reload_secrets(session_token: str = Depends(require_auth)):
 
     Useful after adding or updating secrets without restarting the server.
     """
-    from anyide.main import secret_manager, workspace_tools
+    from anyide.main import secret_manager
 
     count = secret_manager.reload()
     logger.info("secrets_reloaded_via_admin", count=count)

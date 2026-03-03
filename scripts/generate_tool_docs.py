@@ -6,7 +6,6 @@ Usage:
     python scripts/generate_tool_docs.py > docs/TOOL_CATALOG.md
 """
 
-import json
 import os
 import sys
 import tempfile
@@ -57,7 +56,7 @@ def generate_markdown_doc(spec):
     lines = []
     lines.append("# AnyIDE Tool Catalog\n")
     lines.append("Auto-generated documentation for all available tools.\n")
-    lines.append(f"**Generated from:** OpenAPI spec\n")
+    lines.append("**Generated from:** OpenAPI spec\n")
     lines.append(f"**Version:** {spec.get('info', {}).get('version', 'Unknown')}\n")
     lines.append("---\n")
 

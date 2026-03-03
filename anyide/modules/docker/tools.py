@@ -1,8 +1,6 @@
 """Docker container management tools."""
 
 import asyncio
-from typing import Optional
-from datetime import datetime
 
 try:
     import aiodocker

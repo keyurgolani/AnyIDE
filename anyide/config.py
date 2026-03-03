@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Literal, Optional
 
 import yaml
 from pydantic import BaseModel, Field, field_validator, model_validator
-from pydantic_settings import BaseSettings
 
 
 class ServerConfig(BaseModel):

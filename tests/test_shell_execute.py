@@ -1,6 +1,5 @@
 """Tests for shell_execute tool."""
 
-import os
 import pytest
 from anyide.modules.shell.tools import ShellTools
 from anyide.core.workspace import WorkspaceManager, SecurityError

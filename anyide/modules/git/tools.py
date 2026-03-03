@@ -9,7 +9,7 @@ from typing import Optional
 from datetime import datetime
 from contextlib import asynccontextmanager
 
-from anyide.core.workspace import WorkspaceManager, SecurityError
+from anyide.core.workspace import WorkspaceManager
 from anyide.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -150,7 +150,7 @@ fi
             try:
                 process.kill()
                 await process.wait()
-            except:
+            except Exception:
                 pass
             raise TimeoutError(f"Git command timed out after {timeout} seconds")
         except Exception as e:

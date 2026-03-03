@@ -4,7 +4,6 @@ import os
 import re
 import time
 import fnmatch
-from pathlib import Path
 from datetime import datetime
 
 from anyide.models import (
@@ -13,7 +12,7 @@ from anyide.models import (
     FsListRequest, FsListResponse, FsListEntry,
     FsSearchRequest, FsSearchResponse, FsSearchMatch
 )
-from anyide.core.workspace import WorkspaceManager, SecurityError
+from anyide.core.workspace import WorkspaceManager
 from anyide.logging_config import get_logger
 
 logger = get_logger(__name__)

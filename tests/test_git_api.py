@@ -15,7 +15,7 @@ TEST_DATA_DIR = tempfile.mkdtemp()
 os.environ.setdefault("WORKSPACE_BASE_DIR", TEST_WORKSPACE)
 os.environ.setdefault("DB_PATH", os.path.join(TEST_DATA_DIR, "hostbridge.db"))
 
-from anyide.main import app
+from anyide.main import app  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

@@ -9,7 +9,7 @@ Loads secrets from a .env-format file and provides:
 import copy
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from anyide.logging_config import get_logger
 

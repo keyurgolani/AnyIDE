@@ -1,8 +1,6 @@
 """Tests for SecretManager — loading, template resolution, and masking."""
 
-import os
 import tempfile
-from pathlib import Path
 
 import pytest
 

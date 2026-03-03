@@ -1,9 +1,7 @@
 """HTTP client tool with SSRF protection and domain filtering."""
 
 import ipaddress
-import re
 import time
-from typing import Optional
 from urllib.parse import urlparse
 
 import httpx

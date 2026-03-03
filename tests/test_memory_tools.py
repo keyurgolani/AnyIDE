@@ -1,6 +1,5 @@
 """Tests for MemoryTools — knowledge graph storage, retrieval, and traversal."""
 
-import json
 import os
 import tempfile
 
@@ -701,7 +700,7 @@ class TestMemoryStats:
         """Orphaned node count includes nodes with no edges."""
         from anyide.models import MemoryStoreRequest, MemoryLinkRequest
 
-        isolated = await memory_tools.store(MemoryStoreRequest(content="Isolated"))
+        await memory_tools.store(MemoryStoreRequest(content="Isolated"))
         connected_a = await memory_tools.store(MemoryStoreRequest(content="A"))
         connected_b = await memory_tools.store(MemoryStoreRequest(content="B"))
         await memory_tools.link(MemoryLinkRequest(
@@ -728,9 +727,6 @@ class TestMemoryStats:
 # API endpoint integration tests
 # ---------------------------------------------------------------------------
 
-import anyide.config
-import anyide.core.database
-
 _TEST_SECRETS = tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False)
 _TEST_SECRETS.write("TOKEN=secret123\n")
 _TEST_SECRETS.close()
@@ -747,6 +743,9 @@ def setup_memory_app_env():
 async def app_client():
     """Async test client wired to the FastAPI app with a temp DB."""
     os.environ["DB_PATH"] = _TEST_DB_PATH
+
+    import anyide.config
+    import anyide.core.database
 
     original_load = anyide.config.load_config
     original_db_init = anyide.core.database.Database.__init__

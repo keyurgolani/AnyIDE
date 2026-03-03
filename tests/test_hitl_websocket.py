@@ -9,12 +9,8 @@ Note: WebSocket tests use starlette.testclient.TestClient for WebSocket support.
 """
 
 import os
-import sys
 import tempfile
 import pytest
-import asyncio
-import json
-from unittest.mock import AsyncMock, MagicMock, patch
 from starlette.testclient import TestClient
 
 # Set up test environment BEFORE any imports
@@ -277,7 +273,7 @@ class TestHITLConnectionTracking:
 
     def test_decrement_does_not_go_negative(self):
         """Test that decrement doesn't go below zero."""
-        from anyide.admin_api import decrement_ws_connections, websocket_connections
+        from anyide.admin_api import decrement_ws_connections
 
         # Decrement many times
         for _ in range(10):

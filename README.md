@@ -901,7 +901,7 @@ Built following the design principles from:
 
 **Status:** Production Ready  
 **Version:** 0.1.0  
-**Last Updated:** March 2, 2026
+**Last Updated:** March 3, 2026
 
 ---
 
@@ -909,7 +909,7 @@ Built following the design principles from:
 
 The project includes comprehensive test coverage.
 
-As of this snapshot, `pytest --collect-only -q` reports **481 tests collected** across:
+As of this snapshot, `pytest --collect-only -q` reports **509 tests collected** across:
 
 - Unit tests for core modules and tool implementations
 - API and admin endpoint integration tests
@@ -920,3 +920,9 @@ As of this snapshot, `pytest --collect-only -q` reports **481 tests collected** 
 - Tool Explorer contract tests verifying OpenAPI-based tool listing
 - HITL WebSocket roundtrip and disconnect resilience tests
 - Frontend unit tests (Vitest + jsdom) for admin auth/session behavior
+
+Latest validation run:
+- `venv/bin/ruff check .` passes with zero lint violations.
+- `venv/bin/pytest` passes with `505 passed, 4 skipped` and no warnings.
+- Frontend checks pass: `npm test`, `npx tsc --noEmit`, and `npm run build` in `admin/`.
+- Packaging and dependency checks pass: `python -m build`, `python -m pip check`, and `python -m compileall`.

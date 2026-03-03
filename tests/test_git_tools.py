@@ -4,7 +4,6 @@ import os
 import pytest
 import tempfile
 import shutil
-from pathlib import Path
 
 from anyide.modules.git.tools import GitTools
 from anyide.core.workspace import WorkspaceManager
@@ -482,8 +481,6 @@ async def test_git_log_with_path_filter(git_tools, git_repo, temp_workspace):
 # GIT_ASKPASS Authentication Tests (P2-0.6)
 # ============================================================================
 
-import tempfile
-import os
 
 
 class TestGitAskpass:

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import json
 import os
 import time
 from contextlib import asynccontextmanager
@@ -386,8 +385,8 @@ async def health_check():
     return {"status": "healthy", "version": "0.1.0"}
 
 
-# Include admin API
-from anyide.admin_api import router as admin_router
+# Include admin API after app setup to avoid circular imports.
+from anyide.admin_api import router as admin_router  # noqa: E402
 
 app.include_router(admin_router)
 
@@ -585,9 +584,9 @@ async def websocket_logs(websocket: WebSocket):
 
                 logs = await audit_logger.get_logs(limit=limit)
                 if category:
-                    logs = [l for l in logs if l.get("tool_category") == category]
+                    logs = [log_entry for log_entry in logs if log_entry.get("tool_category") == category]
                 if status_filter:
-                    logs = [l for l in logs if l.get("status") == status_filter]
+                    logs = [log_entry for log_entry in logs if log_entry.get("status") == status_filter]
 
                 await websocket.send_json({"type": "logs", "data": logs})
 

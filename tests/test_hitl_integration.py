@@ -5,7 +5,6 @@ import asyncio
 import os
 import tempfile
 import shutil
-from fastapi.testclient import TestClient
 
 # Note: These tests would normally use the actual FastAPI app
 # For now, we'll test the components in isolation

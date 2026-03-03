@@ -1,6 +1,5 @@
 """Tests for fs_list tool."""
 
-import os
 import pytest
 from anyide.modules.fs.tools import FilesystemTools
 from anyide.core.workspace import WorkspaceManager

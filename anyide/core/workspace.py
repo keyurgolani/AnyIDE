@@ -1,7 +1,6 @@
 """Workspace and path resolution with security checks."""
 
 import os
-from pathlib import Path
 from typing import Optional
 
 from anyide.logging_config import get_logger

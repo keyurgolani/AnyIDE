@@ -8,10 +8,8 @@ These tests verify that the tool explorer:
 """
 
 import os
-import sys
 import tempfile
 import pytest
-from unittest.mock import MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 
 # Set up test environment BEFORE any imports
@@ -60,6 +58,8 @@ async def auth_headers(client):
         json={"password": "admin"}
     )
     assert response.status_code == 200
+    for key, value in response.cookies.items():
+        client.cookies.set(key, value)
     return response.cookies
 
 
@@ -70,7 +70,7 @@ class TestToolExplorerOpenAPIContract:
     async def test_tools_come_from_openapi_paths(self, client, auth_headers):
         """Verify tools are extracted from OpenAPI paths, not reflection."""
         # Get tools from admin API
-        response = await client.get("/admin/api/tools", cookies=auth_headers)
+        response = await client.get("/admin/api/tools")
         assert response.status_code == 200
         tools_data = response.json()
 
@@ -92,7 +92,7 @@ class TestToolExplorerOpenAPIContract:
     @pytest.mark.asyncio
     async def test_no_internal_methods_leaked(self, client, auth_headers):
         """Verify no internal methods like 'close', 'tool_dispatch' are exposed."""
-        response = await client.get("/admin/api/tools", cookies=auth_headers)
+        response = await client.get("/admin/api/tools")
         assert response.status_code == 200
         tools_data = response.json()
 
@@ -113,7 +113,7 @@ class TestToolExplorerOpenAPIContract:
     @pytest.mark.asyncio
     async def test_no_admin_routes_in_tools(self, client, auth_headers):
         """Verify admin routes are not included in tools list."""
-        response = await client.get("/admin/api/tools", cookies=auth_headers)
+        response = await client.get("/admin/api/tools")
         assert response.status_code == 200
         tools_data = response.json()
 
@@ -128,7 +128,7 @@ class TestToolExplorerOpenAPIContract:
     @pytest.mark.asyncio
     async def test_valid_tool_categories_only(self, client, auth_headers):
         """Verify only valid tool categories are included."""
-        response = await client.get("/admin/api/tools", cookies=auth_headers)
+        response = await client.get("/admin/api/tools")
         assert response.status_code == 200
         tools_data = response.json()
 
@@ -145,7 +145,7 @@ class TestToolExplorerOpenAPIContract:
     @pytest.mark.asyncio
     async def test_tool_schema_fields_populated(self, client, auth_headers):
         """Verify schema fields are properly populated (not empty {})."""
-        response = await client.get("/admin/api/tools", cookies=auth_headers)
+        response = await client.get("/admin/api/tools")
         assert response.status_code == 200
         tools_data = response.json()
 
@@ -168,7 +168,7 @@ class TestToolExplorerOpenAPIContract:
     @pytest.mark.asyncio
     async def test_tool_has_description(self, client, auth_headers):
         """Verify each tool has a meaningful description."""
-        response = await client.get("/admin/api/tools", cookies=auth_headers)
+        response = await client.get("/admin/api/tools")
         assert response.status_code == 200
         tools_data = response.json()
 
@@ -187,7 +187,7 @@ class TestToolExplorerOpenAPIContract:
     @pytest.mark.asyncio
     async def test_operation_id_matches_tool_name(self, client, auth_headers):
         """Verify operation_id in OpenAPI matches tool naming convention."""
-        response = await client.get("/admin/api/tools", cookies=auth_headers)
+        response = await client.get("/admin/api/tools")
         assert response.status_code == 200
         tools_data = response.json()
 
@@ -208,7 +208,7 @@ class TestToolExplorerOpenAPIContract:
     async def test_specific_tool_schema_endpoint(self, client, auth_headers):
         """Test getting schema for a specific tool via the dedicated endpoint."""
         # First get the list of tools
-        list_response = await client.get("/admin/api/tools", cookies=auth_headers)
+        list_response = await client.get("/admin/api/tools")
         assert list_response.status_code == 200
         tools = list_response.json()["tools"]
 
@@ -216,7 +216,6 @@ class TestToolExplorerOpenAPIContract:
             tool = tools[0]
             response = await client.get(
                 f"/admin/api/tools/{tool['category']}/{tool['name']}",
-                cookies=auth_headers
             )
 
             assert response.status_code == 200
@@ -231,7 +230,7 @@ class TestToolExplorerOpenAPIContract:
     @pytest.mark.asyncio
     async def test_hitl_flag_computed_from_policy(self, client, auth_headers):
         """Verify HITL flag is computed from effective policy, not hardcoded."""
-        response = await client.get("/admin/api/tools", cookies=auth_headers)
+        response = await client.get("/admin/api/tools")
         assert response.status_code == 200
         tools_data = response.json()
 
@@ -243,6 +242,7 @@ class TestToolExplorerOpenAPIContract:
         # (some tools require HITL, some don't)
         # But we won't enforce this strictly as it depends on policy config
         assert len(tools_data["tools"]) > 0, "Should have at least some tools"
+        assert len(hitl_tools) + len(non_hitl_tools) == len(tools_data["tools"])
 
 
 class TestToolExplorerOpenAPISchema:

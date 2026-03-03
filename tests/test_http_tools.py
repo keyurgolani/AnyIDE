@@ -1,5 +1,8 @@
 """Tests for HttpTools — SSRF protection, domain filtering, and requests."""
 
+import os
+import tempfile
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -265,9 +268,6 @@ class TestHttpToolsRequest:
 # ---------------------------------------------------------------------------
 # API endpoint integration tests
 # ---------------------------------------------------------------------------
-
-import os
-import tempfile
 
 # Set up temp paths for DB and workspace before importing app
 _TEST_DB_DIR = tempfile.mkdtemp()

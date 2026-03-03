@@ -88,6 +88,11 @@ If `jq` is not installed, save `openapi.json` and inspect it manually.
 Use these commands to run the release validation gates end-to-end:
 
 ```bash
+# Backend lint + compile/dependency sanity
+venv/bin/ruff check .
+venv/bin/python -m compileall -q anyide tests
+venv/bin/python -m pip check
+
 # Module matrix + dependency-edge integration checks
 venv/bin/pytest tests/test_module_matrix_integration.py tests/test_module_registry.py -q
 
@@ -98,6 +103,16 @@ venv/bin/pytest
 venv/bin/pytest tests/test_security.py -v
 venv/bin/pytest tests/test_integration.py -v
 venv/bin/pytest tests/test_load.py -v
+
+# Package build validation (sdist + wheel)
+venv/bin/python -m build
+
+# Frontend validation
+cd admin
+npm test
+npx tsc --noEmit
+npm run build
+cd ..
 
 # Buildx validation (loads image locally)
 docker buildx build --platform linux/amd64 --load -t hostbridge:anyide-release-check .
@@ -126,6 +141,18 @@ curl -s -X POST http://localhost:18080/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json" \
   -d '{"jsonrpc":"2.0","id":"init","method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"1.0"}}}'
+
+# Optional MCP tools/list after initialize
+SESSION_ID=$(curl -s -D - -o /tmp/mcp_init.json -X POST http://localhost:18080/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"jsonrpc":"2.0","id":"init2","method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"1.0"}}}' \
+  | awk -F': ' 'tolower($1)=="mcp-session-id" {gsub("\r","",$2); print $2; exit}')
+curl -s -X POST http://localhost:18080/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "Mcp-Session-Id: ${SESSION_ID}" \
+  -d '{"jsonrpc":"2.0","id":"tools","method":"tools/list","params":{}}'
 docker rm -f anyide-release-smoke
 ```
 

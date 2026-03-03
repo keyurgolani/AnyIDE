@@ -10,7 +10,7 @@ import asyncio
 import os
 import tempfile
 import time
-from statistics import mean, median
+from statistics import mean
 
 import pytest
 from httpx import AsyncClient, ASGITransport
@@ -129,7 +129,7 @@ class TestResponseTimes:
         avg_time = mean(response_times)
         max_time = max(response_times)
 
-        print(f"\nResponse Time Stats:")
+        print("\nResponse Time Stats:")
         print(f"  Avg: {avg_time*1000:.2f}ms")
         print(f"  Max: {max_time*1000:.2f}ms")
 

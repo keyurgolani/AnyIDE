@@ -4,7 +4,6 @@ import os
 import asyncio
 import shlex
 import time
-from typing import Optional
 
 from anyide.models import ShellExecuteRequest, ShellExecuteResponse
 from anyide.core.workspace import WorkspaceManager, SecurityError
